@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: atharva-solar-portal
+    env: node
+    plan: free
+    buildCommand: "echo 'No build step required'"
+    startCommand: "node server/index.js"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+    disk:
+      name: atharva-data
+      mountPath: /app/data
+      sizeGB: 1
