@@ -710,7 +710,7 @@
     container.innerHTML = `
       <div style="text-align:center;padding:3rem 1rem;color:var(--text-muted);">
         <div style="display:inline-block;margin-bottom:0.75rem;">
-          ${window.Icons.refreshCw}
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
         </div>
         <div>Loading visitor traffic & analytics...</div>
       </div>
@@ -745,7 +745,8 @@
             <p style="font-size:0.875rem;color:var(--text-muted);">Live tracking of visitors, pageviews, and visitor device usage (Admin Only)</p>
           </div>
           <button class="btn btn-secondary btn-sm" onclick="window.refreshAnalyticsTab()" style="display:inline-flex;align-items:center;gap:0.4rem;">
-            ${window.Icons.refreshCw} Refresh Live Traffic
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+            Refresh Live Traffic
           </button>
         </div>
 
