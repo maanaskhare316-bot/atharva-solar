@@ -783,8 +783,31 @@
     });
   }
 
+  // 11. Anonymous Visitor Traffic Tracker (Feeds Admin Analytics)
+  function trackVisitor() {
+    try {
+      let vid = localStorage.getItem('ae_visitor_id');
+      if (!vid) {
+        vid = 'v_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+        localStorage.setItem('ae_visitor_id', vid);
+      }
+      fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visitorId: vid,
+          pagePath: window.location.pathname + window.location.hash,
+          referrer: document.referrer || 'Direct'
+        })
+      }).catch(() => {});
+    } catch (e) {
+      // Non-blocking
+    }
+  }
+
   // Document Ready
   document.addEventListener('DOMContentLoaded', () => {
+    trackVisitor();
     initSubsidyCountdown();
     initCalculator();
     loadBrands();

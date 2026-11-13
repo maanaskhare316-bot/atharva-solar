@@ -9,8 +9,9 @@
   const adminState = {
     token: localStorage.getItem('atharva_admin_token') || '',
     user: null,
-    currentTab: 'leads',
+    currentTab: 'analytics',
     stats: {},
+    analytics: {},
     leads: [],
     appointments: [],
     blockedSlots: [],
@@ -59,29 +60,26 @@
 
     content.innerHTML = `
       <div style="text-align:center;margin-bottom:1.5rem;">
-        <div style="width:52px;height:52px;border-radius:12px;background:var(--navy-900);color:var(--solar-amber);display:inline-flex;align-items:center;justify-content:center;margin-bottom:0.75rem;">
+        <div style="width:52px;height:52px;border-radius:12px;background:#0F1D33;color:#38BDF8;display:inline-flex;align-items:center;justify-content:center;margin-bottom:0.75rem;box-shadow:0 4px 12px rgba(2,132,199,0.3);">
           ${window.Icons.shieldCheck}
         </div>
         <h3 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);margin-bottom:0.35rem;">Atharva Admin Portal</h3>
-        <p style="color:var(--text-muted);font-size:0.875rem;">Secure management of customer leads, visits & site content</p>
+        <p style="color:var(--text-muted);font-size:0.875rem;">Authorized Administrator Access Only</p>
       </div>
 
       <form id="admin-login-form" onsubmit="window.handleAdminLogin(event)">
-        <div class="form-group" style="margin-bottom:1rem;">
+        <div class="form-group" style="margin-bottom:1.15rem;">
           <label class="form-label">Admin Email</label>
-          <input type="email" id="login-email" class="form-input" required value="admin@atharvasolar.com">
+          <input type="email" id="login-email" class="form-input" required placeholder="Enter admin email" autocomplete="username">
         </div>
         <div class="form-group" style="margin-bottom:1.5rem;">
           <label class="form-label">Password</label>
-          <input type="password" id="login-password" class="form-input" required value="Atharva@2026">
+          <input type="password" id="login-password" class="form-input" required placeholder="Enter password" autocomplete="current-password">
         </div>
-        <button type="submit" class="btn btn-navy" style="width:100%;">
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
           Sign In to Admin Dashboard
         </button>
       </form>
-      <div style="margin-top:1rem;text-align:center;font-size:0.75rem;color:var(--text-muted);">
-        Default Credentials: <code>admin@atharvasolar.com</code> / <code>Atharva@2026</code>
-      </div>
     `;
 
     modal.classList.add('active');
@@ -107,7 +105,7 @@
         window.showToast('Welcome, Administrator!', 'success');
         renderAdminUI();
       } else {
-        window.showToast(data.error || 'Authentication failed', 'error');
+        window.showToast(data.error || 'Invalid email or password', 'error');
       }
     } catch (err) {
       window.showToast('Login error. Please check server.', 'error');
@@ -136,15 +134,28 @@
 
   async function loadStats() {
     try {
-      const res = await adminFetch('/api/admin/stats');
-      const data = await res.json();
-      if (data.success && data.stats) {
-        adminState.stats = data.stats;
-        document.getElementById('kpi-total-enquiries').textContent = data.stats.totalEnquiries;
-        document.getElementById('kpi-new-enquiries').textContent = data.stats.newEnquiries;
-        document.getElementById('kpi-total-appointments').textContent = data.stats.totalAppointments;
-        document.getElementById('kpi-confirmed-appointments').textContent = data.stats.confirmedAppointments;
-        document.getElementById('kpi-pending-appointments').textContent = data.stats.pendingAppointments;
+      const [statsRes, analyticsRes] = await Promise.all([
+        adminFetch('/api/admin/stats').then(r => r.json()).catch(() => ({})),
+        adminFetch('/api/admin/analytics').then(r => r.json()).catch(() => ({}))
+      ]);
+
+      if (statsRes && statsRes.stats) {
+        adminState.stats = statsRes.stats;
+        const elEnq = document.getElementById('kpi-total-enquiries');
+        if (elEnq) elEnq.textContent = statsRes.stats.totalEnquiries || 0;
+        const elAppt = document.getElementById('kpi-total-appointments');
+        if (elAppt) elAppt.textContent = statsRes.stats.totalAppointments || 0;
+      }
+
+      if (analyticsRes && analyticsRes.analytics) {
+        adminState.analytics = analyticsRes.analytics;
+        const a = analyticsRes.analytics;
+        const elUniq = document.getElementById('kpi-unique-visitors');
+        if (elUniq) elUniq.textContent = a.uniqueVisitors || 0;
+        const elToday = document.getElementById('kpi-today-visitors');
+        if (elToday) elToday.textContent = a.todayUnique || 0;
+        const elViews = document.getElementById('kpi-total-views');
+        if (elViews) elViews.textContent = a.totalViews || 0;
       }
     } catch (err) {
       console.error(err);
@@ -159,9 +170,11 @@
     });
 
     const pane = document.getElementById('admin-tab-content');
-    if (tab === 'leads') renderLeadsTab(pane);
+    if (tab === 'analytics') renderAnalyticsTab(pane);
     else if (tab === 'appointments') renderAppointmentsTab(pane);
+    else if (tab === 'leads') renderLeadsTab(pane);
     else if (tab === 'brands') renderBrandsTab(pane);
+    else if (tab === 'security') renderSecurityTab(pane);
     else if (tab === 'settings') renderSettingsTab(pane);
   }
 
@@ -692,9 +705,243 @@
     }
   };
 
-  // Route listener: Check if hash is #admin
+  // TAB 0: Website Traffic & Live Visitor Analytics
+  async function renderAnalyticsTab(container) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:3rem 1rem;color:var(--text-muted);">
+        <div style="display:inline-block;margin-bottom:0.75rem;">
+          ${window.Icons.refreshCw}
+        </div>
+        <div>Loading visitor traffic & analytics...</div>
+      </div>
+    `;
+
+    try {
+      const res = await adminFetch('/api/admin/analytics');
+      const data = await res.json();
+      const a = data.analytics || {};
+
+      // Device calculations
+      const devices = a.devices || [];
+      let totalDev = 0;
+      let mobileCount = 0;
+      let desktopCount = 0;
+      let tabletCount = 0;
+      devices.forEach(d => {
+        totalDev += d.count;
+        if (d.device_type === 'Mobile') mobileCount = d.count;
+        else if (d.device_type === 'Desktop') desktopCount = d.count;
+        else if (d.device_type === 'Tablet') tabletCount = d.count;
+      });
+
+      const mobilePct = totalDev > 0 ? Math.round((mobileCount / totalDev) * 100) : 0;
+      const desktopPct = totalDev > 0 ? Math.round((desktopCount / totalDev) * 100) : 0;
+      const tabletPct = totalDev > 0 ? Math.round((tabletCount / totalDev) * 100) : 0;
+
+      container.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h2 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);">Website Traffic & Visitor Analytics</h2>
+            <p style="font-size:0.875rem;color:var(--text-muted);">Live tracking of visitors, pageviews, and visitor device usage (Admin Only)</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="window.refreshAnalyticsTab()" style="display:inline-flex;align-items:center;gap:0.4rem;">
+            ${window.Icons.refreshCw} Refresh Live Traffic
+          </button>
+        </div>
+
+        <!-- 4 Detailed Visitor Metrics -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:1rem;margin-bottom:1.75rem;">
+          <div style="background:#FFFFFF;padding:1.25rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);">
+            <div style="font-size:0.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.35rem;">Total Page Views (Hits)</div>
+            <div style="font-size:2rem;font-weight:900;color:var(--navy-900);">${a.totalViews || 0}</div>
+            <div style="font-size:0.75rem;color:#0284C7;margin-top:0.25rem;">Total times site was opened</div>
+          </div>
+          <div style="background:#FFFFFF;padding:1.25rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);">
+            <div style="font-size:0.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.35rem;">Total Unique Visitors</div>
+            <div style="font-size:2rem;font-weight:900;color:#0284C7;">${a.uniqueVisitors || 0}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Distinct potential clients</div>
+          </div>
+          <div style="background:#FFFFFF;padding:1.25rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);">
+            <div style="font-size:0.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.35rem;">Today's Page Views</div>
+            <div style="font-size:2rem;font-weight:900;color:var(--solar-green);">${a.todayViews || 0}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Hits today</div>
+          </div>
+          <div style="background:#FFFFFF;padding:1.25rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);">
+            <div style="font-size:0.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.35rem;">Today's Unique Visitors</div>
+            <div style="font-size:2rem;font-weight:900;color:var(--solar-amber);">${a.todayUnique || 0}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">New active visitors today</div>
+          </div>
+        </div>
+
+        <!-- Device Breakdown Card -->
+        <div style="background:#FFFFFF;padding:1.5rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);margin-bottom:1.75rem;">
+          <h3 style="font-size:1.1rem;font-weight:800;color:var(--navy-900);margin-bottom:1rem;">Visitor Device Breakdown</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:1.25rem;">
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.4rem;">
+                <span>📱 Mobile Phones</span>
+                <strong>${mobilePct}% (${mobileCount})</strong>
+              </div>
+              <div style="height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden;">
+                <div style="width:${mobilePct}%;height:100%;background:var(--solar-green);border-radius:4px;"></div>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.4rem;">
+                <span>💻 Desktops & Laptops</span>
+                <strong>${desktopPct}% (${desktopCount})</strong>
+              </div>
+              <div style="height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden;">
+                <div style="width:${desktopPct}%;height:100%;background:#0284C7;border-radius:4px;"></div>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.4rem;">
+                <span>📟 Tablets</span>
+                <strong>${tabletPct}% (${tabletCount})</strong>
+              </div>
+              <div style="height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden;">
+                <div style="width:${tabletPct}%;height:100%;background:var(--solar-amber);border-radius:4px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Visitor Log Table -->
+        <div style="background:#FFFFFF;padding:1.5rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+            <h3 style="font-size:1.1rem;font-weight:800;color:var(--navy-900);">Recent Live Visitors Log</h3>
+            <span style="font-size:0.8rem;color:var(--text-muted);">Latest 25 recorded visits</span>
+          </div>
+          
+          <div style="overflow-x:auto;">
+            <table class="admin-table" style="width:100%;">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Device</th>
+                  <th>Page Visited</th>
+                  <th>Referrer Source</th>
+                  <th>Visitor ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(a.recentVisits && a.recentVisits.length > 0) ? a.recentVisits.map(v => `
+                  <tr>
+                    <td style="white-space:nowrap;font-size:0.85rem;color:var(--navy-900);font-weight:600;">
+                      ${new Date(v.visited_at).toLocaleString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
+                    </td>
+                    <td>
+                      <span class="badge ${v.device_type === 'Mobile' ? 'badge-green' : v.device_type === 'Tablet' ? 'badge-amber' : 'badge-blue'}">
+                        ${v.device_type === 'Mobile' ? '📱 Mobile' : v.device_type === 'Tablet' ? '📟 Tablet' : '💻 Desktop'}
+                      </span>
+                    </td>
+                    <td style="font-size:0.85rem;color:#0284C7;font-family:monospace;">
+                      ${v.page_path || '/'}
+                    </td>
+                    <td style="font-size:0.85rem;color:var(--text-muted);">
+                      ${v.referrer || 'Direct'}
+                    </td>
+                    <td style="font-size:0.75rem;font-family:monospace;color:#94A3B8;">
+                      ${(v.visitor_id || '').substring(0, 10)}...
+                    </td>
+                  </tr>
+                `).join('') : `
+                  <tr>
+                    <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                      No visitor traffic recorded yet. Once users visit the website, their data will appear live here!
+                    </td>
+                  </tr>
+                `}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    } catch (err) {
+      container.innerHTML = `<div style="color:#EF4444;padding:2rem;">Error loading visitor analytics: ${err.message}</div>`;
+    }
+  }
+
+  window.refreshAnalyticsTab = function () {
+    const pane = document.getElementById('admin-tab-content');
+    renderAnalyticsTab(pane);
+    loadStats();
+  };
+
+  // TAB 4: Admin Password & Security
+  function renderSecurityTab(container) {
+    container.innerHTML = `
+      <div style="max-width:550px;">
+        <div style="margin-bottom:1.5rem;">
+          <h2 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);">Admin Password & Security</h2>
+          <p style="font-size:0.875rem;color:var(--text-muted);">Set your own secret password so no unauthorized person can access the portal</p>
+        </div>
+
+        <div style="background:#FFFFFF;padding:1.75rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);">
+          <form id="change-password-form" onsubmit="window.handleChangePassword(event)">
+            <div class="form-group" style="margin-bottom:1.25rem;">
+              <label class="form-label">Current Password</label>
+              <input type="password" id="cp-current" class="form-input" required placeholder="Enter current admin password">
+            </div>
+
+            <div class="form-group" style="margin-bottom:1.25rem;">
+              <label class="form-label">New Secret Password (min 6 characters)</label>
+              <input type="password" id="cp-new" class="form-input" required minlength="6" placeholder="Enter new secret password">
+            </div>
+
+            <div class="form-group" style="margin-bottom:1.5rem;">
+              <label class="form-label">Confirm New Password</label>
+              <input type="password" id="cp-confirm" class="form-input" required minlength="6" placeholder="Re-type new secret password">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:0.5rem;">
+              Update Password
+            </button>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+
+  window.handleChangePassword = async function (e) {
+    e.preventDefault();
+    const oldPassword = document.getElementById('cp-current').value;
+    const newPassword = document.getElementById('cp-new').value;
+    const confirmPassword = document.getElementById('cp-confirm').value;
+
+    if (newPassword !== confirmPassword) {
+      window.showToast('New passwords do not match!', 'error');
+      return;
+    }
+
+    try {
+      const res = await adminFetch('/api/admin/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword, newPassword })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        window.showToast('Admin password updated successfully! Please remember your new password.', 'success');
+        document.getElementById('change-password-form').reset();
+      } else {
+        window.showToast(data.error || 'Failed to update password', 'error');
+      }
+    } catch (err) {
+      window.showToast(err.message || 'Error updating password', 'error');
+    }
+  };
+
+  // Route listener: Check if path or hash is admin portal
   function handleRoute() {
-    if (window.location.hash === '#admin') {
+    const isSecretRoute = 
+      window.location.hash === '#admin-portal' || 
+      window.location.hash === '#admin' || 
+      window.location.pathname === '/admin-portal' || 
+      window.location.pathname === '/admin';
+
+    if (isSecretRoute) {
       checkAuth();
     } else {
       document.getElementById('admin-view-wrap').style.display = 'none';
@@ -704,5 +951,13 @@
 
   window.addEventListener('hashchange', handleRoute);
   document.addEventListener('DOMContentLoaded', handleRoute);
+
+  // Discreet secret shortcut: Ctrl+Shift+A opens the portal
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+      e.preventDefault();
+      window.location.hash = '#admin-portal';
+    }
+  });
 
 })();

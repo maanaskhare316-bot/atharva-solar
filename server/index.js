@@ -7,8 +7,8 @@ const http = require('node:http');
 const url = require('node:url');
 const path = require('node:path');
 const fs = require('node:fs');
-const { db, getSettings, updateSetting } = require('./db');
-const { authenticate, validateSession, revokeSession } = require('./auth');
+const { db, getSettings, updateSetting, recordVisit, getVisitorAnalytics } = require('./db');
+const { authenticate, validateSession, revokeSession, changePassword } = require('./auth');
 const {
   isValidIndianPhone,
   formatPhone,
@@ -720,6 +720,60 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
+  // 10. Visitor Traffic Analytics (Admin Only)
+  if (pathname === '/api/admin/analytics' && method === 'GET') {
+    const user = getAuthUser(req);
+    if (!user) return sendJSON(res, 401, { error: 'Unauthorized' });
+    const analytics = getVisitorAnalytics();
+    return sendJSON(res, 200, { success: true, analytics });
+  }
+
+  // 11. Change Admin Password (Admin Only)
+  if (pathname === '/api/admin/change-password' && method === 'POST') {
+    const user = getAuthUser(req);
+    if (!user) return sendJSON(res, 401, { error: 'Unauthorized' });
+    const body = await parseRequestBody(req);
+    if (!body.oldPassword || !body.newPassword) {
+      return sendJSON(res, 400, { error: 'Both current password and new password are required' });
+    }
+    if (body.newPassword.length < 6) {
+      return sendJSON(res, 400, { error: 'New password must be at least 6 characters' });
+    }
+    const success = changePassword(user.userId, body.oldPassword, body.newPassword);
+    if (!success) {
+      return sendJSON(res, 400, { error: 'Incorrect current password' });
+    }
+    return sendJSON(res, 200, { success: true, message: 'Password updated successfully' });
+  }
+
+  // 12. Public Visitor Tracking Ping
+  if (pathname === '/api/analytics/track' && method === 'POST') {
+    try {
+      const body = await parseRequestBody(req);
+      const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+      const ip = rawIp.split(',')[0].trim();
+      const ua = req.headers['user-agent'] || '';
+      let deviceType = 'Desktop';
+      if (/mobile|android|iphone/i.test(ua)) {
+        deviceType = 'Mobile';
+      } else if (/tablet|ipad/i.test(ua)) {
+        deviceType = 'Tablet';
+      }
+
+      recordVisit({
+        visitorId: body.visitorId || 'v_' + Math.random().toString(36).substring(2, 9),
+        ipAddress: ip,
+        userAgent: ua.substring(0, 250),
+        deviceType,
+        pagePath: body.pagePath || '/',
+        referrer: body.referrer || 'Direct'
+      });
+      return sendJSON(res, 200, { success: true });
+    } catch (err) {
+      return sendJSON(res, 200, { success: false });
+    }
+  }
+
   // -------------------------------------------------------------
   // STATIC FILE SERVING
   // -------------------------------------------------------------
@@ -769,7 +823,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Atharva Enterprises Solar Web Application`);
   console.log(`A Class Electrical & PWD Contractor`);
   console.log(`Listening on http://localhost:${PORT}`);
-  console.log(`Admin Portal: http://localhost:${PORT}/admin`);
-  console.log(`Default Credentials: admin@atharvasolar.com / Atharva@2026`);
+  console.log(`Protected Admin Route: http://localhost:${PORT}/admin-portal`);
   console.log(`====================================================`);
 });

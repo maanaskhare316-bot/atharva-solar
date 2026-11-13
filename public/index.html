@@ -83,7 +83,6 @@
           <a href="https://wa.me/919039005531?text=Hello%20Atharva%20Enterprises,%20I%20am%20interested%20in%20installing%20a%20solar%20system.%20Please%20share%20details%20about%20available%20options,%20pricing%20and%20subsidy." target="_blank" rel="noopener noreferrer" class="top-bar-item" style="color:#25D366;">
             <span>WhatsApp Quick Chat</span>
           </a>
-          <a href="#admin" style="color:#94A3B8;font-size:0.75rem;text-decoration:underline;">Admin Portal</a>
         </div>
       </div>
     </div>
@@ -181,7 +180,6 @@
         <li><a href="#why-us" class="nav-link">Why Choose Us & Process</a></li>
         <li><a href="#schedule" class="nav-link">Book Free Site Visit</a></li>
         <li><a href="#contact" class="nav-link">Contact Information</a></li>
-        <li><a href="#admin" class="nav-link" style="color:var(--solar-amber);">Admin Portal Login</a></li>
       </ul>
       <div class="mobile-quick-actions">
         <a href="#schedule" class="btn btn-primary" style="width:100%;justify-content:center;">
@@ -980,7 +978,6 @@
               <li><a href="#subsidy" class="footer-link">Solar Subsidy Scheme</a></li>
               <li><a href="#schedule" class="footer-link">Schedule Meeting</a></li>
               <li><a href="#contact" class="footer-link">Contact Us</a></li>
-              <li><a href="#admin" class="footer-link">Admin Dashboard</a></li>
             </ul>
           </div>
 
@@ -1057,17 +1054,25 @@
 
     <!-- Admin Navigation Tabs -->
     <div class="admin-nav-tabs">
-      <button class="admin-tab-btn active" data-tab="leads" onclick="window.switchAdminTab('leads')">
-        Enquiries & Leads
+      <button class="admin-tab-btn active" data-tab="analytics" onclick="window.switchAdminTab('analytics')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        Website Traffic & Visitors
       </button>
       <button class="admin-tab-btn" data-tab="appointments" onclick="window.switchAdminTab('appointments')">
-        Appointments & Visits
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+        Site Visit Bookings
+      </button>
+      <button class="admin-tab-btn" data-tab="leads" onclick="window.switchAdminTab('leads')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Customer Enquiries
       </button>
       <button class="admin-tab-btn" data-tab="brands" onclick="window.switchAdminTab('brands')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
         Solar Brands
       </button>
-      <button class="admin-tab-btn" data-tab="settings" onclick="window.switchAdminTab('settings')">
-        Site CMS & Settings
+      <button class="admin-tab-btn" data-tab="security" onclick="window.switchAdminTab('security')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Admin Password & Security
       </button>
     </div>
 
@@ -1077,24 +1082,24 @@
       <!-- KPI Stats Grid -->
       <div class="kpi-cards-grid">
         <div class="kpi-card">
-          <div class="kpi-label">Total Leads</div>
-          <div id="kpi-total-enquiries" class="kpi-value">0</div>
+          <div class="kpi-label">Total Unique Visitors</div>
+          <div id="kpi-unique-visitors" class="kpi-value" style="color:#38BDF8;">0</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">New Leads</div>
-          <div id="kpi-new-enquiries" class="kpi-value" style="color:var(--solar-green);">0</div>
+          <div class="kpi-label">Today's Visitors</div>
+          <div id="kpi-today-visitors" class="kpi-value" style="color:var(--solar-green);">0</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Total Appointments</div>
-          <div id="kpi-total-appointments" class="kpi-value">0</div>
+          <div class="kpi-label">Total Site Visits (Hits)</div>
+          <div id="kpi-total-views" class="kpi-value">0</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Confirmed Visits</div>
-          <div id="kpi-confirmed-appointments" class="kpi-value" style="color:#0284C7;">0</div>
+          <div class="kpi-label">Site Visit Bookings</div>
+          <div id="kpi-total-appointments" class="kpi-value" style="color:#0284C7;">0</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Pending Reviews</div>
-          <div id="kpi-pending-appointments" class="kpi-value" style="color:var(--solar-amber);">0</div>
+          <div class="kpi-label">Customer Leads</div>
+          <div id="kpi-total-enquiries" class="kpi-value" style="color:var(--solar-amber);">0</div>
         </div>
       </div>
 

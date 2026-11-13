@@ -121,6 +121,18 @@ function initSchema() {
       reason TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- Site Visits & Visitor Traffic Analytics (Admin Only)
+    CREATE TABLE IF NOT EXISTS site_visits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      visitor_id TEXT NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      device_type TEXT DEFAULT 'Desktop',
+      page_path TEXT DEFAULT '/',
+      referrer TEXT,
+      visited_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   seedDefaultData();
@@ -461,5 +473,57 @@ module.exports = {
       VALUES (?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
     `).run(key, value);
+  },
+  recordVisit({ visitorId, ipAddress, userAgent, deviceType, pagePath, referrer }) {
+    try {
+      db.prepare(`
+        INSERT INTO site_visits (visitor_id, ip_address, user_agent, device_type, page_path, referrer)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(visitorId, ipAddress || '', userAgent || '', deviceType || 'Desktop', pagePath || '/', referrer || 'Direct');
+      return true;
+    } catch (err) {
+      console.error('Error recording site visit:', err);
+      return false;
+    }
+  },
+  getVisitorAnalytics() {
+    try {
+      const totalViews = db.prepare('SELECT COUNT(*) as count FROM site_visits').get().count;
+      const uniqueVisitors = db.prepare('SELECT COUNT(DISTINCT visitor_id) as count FROM site_visits').get().count;
+      const todayViews = db.prepare("SELECT COUNT(*) as count FROM site_visits WHERE DATE(visited_at, 'localtime') = DATE('now', 'localtime')").get().count;
+      const todayUnique = db.prepare("SELECT COUNT(DISTINCT visitor_id) as count FROM site_visits WHERE DATE(visited_at, 'localtime') = DATE('now', 'localtime')").get().count;
+      
+      const recentVisits = db.prepare(`
+        SELECT id, visitor_id, device_type, page_path, referrer, visited_at
+        FROM site_visits
+        ORDER BY id DESC
+        LIMIT 25
+      `).all();
+
+      const devices = db.prepare(`
+        SELECT device_type, COUNT(*) as count
+        FROM site_visits
+        GROUP BY device_type
+      `).all();
+
+      return {
+        totalViews,
+        uniqueVisitors,
+        todayViews,
+        todayUnique,
+        recentVisits,
+        devices
+      };
+    } catch (err) {
+      console.error('Error fetching visitor analytics:', err);
+      return {
+        totalViews: 0,
+        uniqueVisitors: 0,
+        todayViews: 0,
+        todayUnique: 0,
+        recentVisits: [],
+        devices: []
+      };
+    }
   }
 };
