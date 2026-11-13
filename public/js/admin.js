@@ -34,8 +34,10 @@
 
   // Check auth on load
   async function checkAuth() {
+    document.getElementById('public-view-wrap').style.display = 'none';
+
     if (!adminState.token) {
-      showLoginModal();
+      showLoginScreen();
       return false;
     }
 
@@ -50,40 +52,45 @@
     } catch (err) {
       // not authenticated
     }
-    showLoginModal();
+    showLoginScreen();
     return false;
   }
 
-  function showLoginModal() {
-    const modal = document.getElementById('generic-modal');
-    const content = document.getElementById('generic-modal-content');
-
-    content.innerHTML = `
-      <div style="text-align:center;margin-bottom:1.5rem;">
-        <div style="width:52px;height:52px;border-radius:12px;background:#0F1D33;color:#38BDF8;display:inline-flex;align-items:center;justify-content:center;margin-bottom:0.75rem;box-shadow:0 4px 12px rgba(2,132,199,0.3);">
-          ${window.Icons.shieldCheck}
-        </div>
-        <h3 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);margin-bottom:0.35rem;">Atharva Admin Portal</h3>
-        <p style="color:var(--text-muted);font-size:0.875rem;">Authorized Administrator Access Only</p>
-      </div>
-
-      <form id="admin-login-form" onsubmit="window.handleAdminLogin(event)">
-        <div class="form-group" style="margin-bottom:1.15rem;">
-          <label class="form-label">Admin Email</label>
-          <input type="email" id="login-email" class="form-input" required placeholder="Enter admin email" autocomplete="username">
-        </div>
-        <div class="form-group" style="margin-bottom:1.5rem;">
-          <label class="form-label">Password</label>
-          <input type="password" id="login-password" class="form-input" required placeholder="Enter password" autocomplete="current-password">
-        </div>
-        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
-          Sign In to Admin Dashboard
-        </button>
-      </form>
-    `;
-
-    modal.classList.add('active');
+  function showLoginScreen() {
+    document.getElementById('public-view-wrap').style.display = 'none';
+    document.getElementById('admin-view-wrap').style.display = 'none';
+    const loginScreen = document.getElementById('admin-login-screen');
+    if (loginScreen) {
+      loginScreen.style.display = 'flex';
+      const emailInput = document.getElementById('login-email');
+      const passInput = document.getElementById('login-password');
+      if (emailInput) emailInput.value = '';
+      if (passInput) passInput.value = '';
+    }
   }
+
+  window.exitAdminToPublic = function (e) {
+    if (e) e.preventDefault();
+    const loginScreen = document.getElementById('admin-login-screen');
+    const adminWrap = document.getElementById('admin-view-wrap');
+    const publicWrap = document.getElementById('public-view-wrap');
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (adminWrap) adminWrap.style.display = 'none';
+    if (publicWrap) publicWrap.style.display = 'block';
+    window.location.hash = '';
+  };
+
+  window.togglePasswordVisibility = function (inputId, btnEl) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    if (input.type === 'password') {
+      input.type = 'text';
+      btnEl.textContent = 'Hide Password';
+    } else {
+      input.type = 'password';
+      btnEl.textContent = 'Show Password';
+    }
+  };
 
   window.handleAdminLogin = async function (e) {
     e.preventDefault();
@@ -101,8 +108,7 @@
         adminState.token = data.token;
         adminState.user = data.user;
         localStorage.setItem('atharva_admin_token', data.token);
-        window.closeModal();
-        window.showToast('Welcome, Administrator!', 'success');
+        window.showToast('Welcome to Atharva Operations Dashboard!', 'success');
         renderAdminUI();
       } else {
         window.showToast(data.error || 'Invalid email or password', 'error');
@@ -116,8 +122,12 @@
     localStorage.removeItem('atharva_admin_token');
     adminState.token = '';
     adminState.user = null;
-    document.getElementById('admin-view-wrap').style.display = 'none';
-    document.getElementById('public-view-wrap').style.display = 'block';
+    const loginScreen = document.getElementById('admin-login-screen');
+    const adminWrap = document.getElementById('admin-view-wrap');
+    const publicWrap = document.getElementById('public-view-wrap');
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (adminWrap) adminWrap.style.display = 'none';
+    if (publicWrap) publicWrap.style.display = 'block';
     window.location.hash = '';
     window.showToast('Logged out successfully', 'info');
   };
@@ -125,8 +135,10 @@
   // Render UI and load tabs
   async function renderAdminUI() {
     document.getElementById('public-view-wrap').style.display = 'none';
+    const loginScreen = document.getElementById('admin-login-screen');
+    if (loginScreen) loginScreen.style.display = 'none';
     const adminWrap = document.getElementById('admin-view-wrap');
-    adminWrap.style.display = 'block';
+    if (adminWrap) adminWrap.style.display = 'block';
 
     await loadStats();
     switchTab(adminState.currentTab);
@@ -381,31 +393,98 @@
     }
   };
 
-  // TAB 2: Appointments & Visits
+  // TAB 2: Appointments & Site Visits Command Center
   async function renderAppointmentsTab(container) {
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
         <div>
-          <h2 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);">Scheduled Site Visits & Consultations</h2>
-          <p style="font-size:0.875rem;color:var(--text-muted);">Confirm customer visits, assign survey technicians, and manage schedule</p>
+          <h2 style="font-size:1.55rem;font-weight:900;color:#FFFFFF;letter-spacing:-0.02em;">📅 Site Visit & Meeting Bookings</h2>
+          <p style="font-size:0.875rem;color:#94A3B8;">Real-time rooftop inspection appointments booked by homeowners and businesses across Madhya Pradesh</p>
         </div>
-        <div style="display:flex;gap:0.75rem;">
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="window.exportAppointmentsCSV()" style="background:#0F1D33;color:#38BDF8;border-color:rgba(56,189,248,0.3);display:inline-flex;align-items:center;gap:0.4rem;">
+            ${window.Icons.download} Export CSV
+          </button>
           <button class="btn btn-amber btn-sm" onclick="window.openBlockDateModal()">
             ${window.Icons.calendar} Block Date / Slot
           </button>
           <button class="btn btn-primary btn-sm" onclick="window.loadAndDisplayAppointments()">
-            Refresh
+            Refresh Bookings
           </button>
         </div>
       </div>
 
+      <!-- Quick Status Filter Ribbon & Live Search Bar -->
+      <div class="admin-card-pane" style="margin-bottom:1.5rem;padding:1.25rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+          
+          <!-- Filter Buttons -->
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="appointment-filter-chips">
+            <button class="btn btn-sm" style="background:#0284C7;color:#FFFFFF;border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('all', this)">
+              All Bookings (<span id="count-all-apts">0</span>)
+            </button>
+            <button class="btn btn-sm" style="background:#1E293B;color:#FBBF24;border:1px solid rgba(245,158,11,0.3);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('pending', this)">
+              ⏳ Pending (<span id="count-pending-apts">0</span>)
+            </button>
+            <button class="btn btn-sm" style="background:#1E293B;color:#34D399;border:1px solid rgba(52,211,153,0.3);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('confirmed', this)">
+              ✅ Confirmed (<span id="count-confirmed-apts">0</span>)
+            </button>
+            <button class="btn btn-sm" style="background:#1E293B;color:#38BDF8;border:1px solid rgba(56,189,248,0.3);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('today', this)">
+              📅 Today's Visits (<span id="count-today-apts">0</span>)
+            </button>
+            <button class="btn btn-sm" style="background:#1E293B;color:#CBD5E1;border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('completed', this)">
+              🏁 Completed (<span id="count-completed-apts">0</span>)
+            </button>
+          </div>
+
+          <!-- Instant Live Search -->
+          <div style="min-width:260px;flex:1;max-width:380px;">
+            <input type="text" id="appointment-search-input" class="form-input admin-dark-input" placeholder="🔍 Search customer, phone, city..." oninput="window.filterAppointmentsLive()" style="padding:0.55rem 0.85rem;font-size:0.85rem;">
+          </div>
+        </div>
+      </div>
+
       <div id="appointments-table-wrap" class="admin-table-container">
-        <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading appointments...</div>
+        <div style="padding:2.5rem;text-align:center;color:#94A3B8;">Loading appointments...</div>
       </div>
     `;
 
     await loadAndDisplayAppointments();
   }
+
+  adminState.appointmentFilter = 'all';
+
+  window.setAppointmentFilter = function (filter, btnEl) {
+    adminState.appointmentFilter = filter;
+    document.querySelectorAll('#appointment-filter-chips button').forEach(b => {
+      b.style.background = '#1E293B';
+    });
+    if (btnEl) btnEl.style.background = '#0284C7';
+    window.filterAppointmentsLive();
+  };
+
+  window.filterAppointmentsLive = function () {
+    const search = (document.getElementById('appointment-search-input')?.value || '').toLowerCase().trim();
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const filtered = (adminState.appointments || []).filter(a => {
+      const matchSearch = !search ||
+        (a.full_name || '').toLowerCase().includes(search) ||
+        (a.phone || '').includes(search) ||
+        (a.city || '').toLowerCase().includes(search) ||
+        (a.reference_no || '').toLowerCase().includes(search);
+
+      let matchFilter = true;
+      if (adminState.appointmentFilter === 'pending') matchFilter = a.status === 'pending';
+      else if (adminState.appointmentFilter === 'confirmed') matchFilter = a.status === 'confirmed';
+      else if (adminState.appointmentFilter === 'completed') matchFilter = a.status === 'completed';
+      else if (adminState.appointmentFilter === 'today') matchFilter = a.appointment_date === todayStr;
+
+      return matchSearch && matchFilter;
+    });
+
+    renderAppointmentsTable(filtered);
+  };
 
   async function loadAndDisplayAppointments() {
     try {
@@ -413,6 +492,20 @@
       const data = await res.json();
       if (data.success && data.appointments) {
         adminState.appointments = data.appointments;
+
+        // Update counts
+        const todayStr = new Date().toISOString().split('T')[0];
+        const elAll = document.getElementById('count-all-apts');
+        if (elAll) elAll.textContent = data.appointments.length;
+        const elPending = document.getElementById('count-pending-apts');
+        if (elPending) elPending.textContent = data.appointments.filter(a => a.status === 'pending').length;
+        const elConfirmed = document.getElementById('count-confirmed-apts');
+        if (elConfirmed) elConfirmed.textContent = data.appointments.filter(a => a.status === 'confirmed').length;
+        const elToday = document.getElementById('count-today-apts');
+        if (elToday) elToday.textContent = data.appointments.filter(a => a.appointment_date === todayStr).length;
+        const elCompleted = document.getElementById('count-completed-apts');
+        if (elCompleted) elCompleted.textContent = data.appointments.filter(a => a.status === 'completed').length;
+
         renderAppointmentsTable(data.appointments);
       }
     } catch (err) {
@@ -427,66 +520,165 @@
     if (!wrap) return;
 
     if (apts.length === 0) {
-      wrap.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);">No appointments booked yet.</div>';
+      wrap.innerHTML = '<div style="padding:3rem;text-align:center;color:#94A3B8;">No meeting appointments match your filter.</div>';
       return;
     }
+
+    const todayStr = new Date().toISOString().split('T')[0];
 
     wrap.innerHTML = `
       <table class="admin-table">
         <thead>
           <tr>
-            <th>Ref No / Date</th>
+            <th>Booking Ref / Date</th>
             <th>Time Slot</th>
             <th>Customer & City</th>
-            <th>Visit Type</th>
+            <th>Consultation Type</th>
+            <th>Monthly Bill & Roof Notes</th>
             <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          ${apts.map(a => `
-            <tr>
-              <td>
-                <strong>${a.reference_no}</strong><br>
-                <span style="font-weight:600;color:var(--navy-900);">${a.appointment_date}</span>
-              </td>
-              <td>
-                <span class="badge-tag badge-blue" style="font-size:0.75rem;margin:0;">${a.time_slot}</span>
-              </td>
-              <td>
-                <strong>${a.full_name}</strong><br>
-                <span style="font-size:0.8rem;color:var(--text-muted);">${a.phone}</span><br>
-                <span style="font-size:0.75rem;color:var(--solar-green);">${a.city} (${a.property_type})</span>
-              </td>
-              <td>
-                <span style="font-weight:600;font-size:0.8rem;">${a.meeting_type.replace('_', ' ').toUpperCase()}</span>
-                ${a.requirements ? `<br><small style="color:var(--text-muted);">${a.requirements.slice(0, 45)}...</small>` : ''}
-              </td>
-              <td>
-                <select class="form-select" style="font-size:0.8rem;padding:0.35rem 0.5rem;" onchange="window.updateAppointmentStatus(${a.id}, this.value)">
-                  <option value="pending" ${a.status === 'pending' ? 'selected' : ''}>Pending</option>
-                  <option value="confirmed" ${a.status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
-                  <option value="completed" ${a.status === 'completed' ? 'selected' : ''}>Completed</option>
-                  <option value="cancelled" ${a.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
-                  <option value="rejected" ${a.status === 'rejected' ? 'selected' : ''}>Rejected</option>
-                </select>
-              </td>
-              <td>
-                <div style="display:flex;gap:0.4rem;">
-                  <a href="tel:${a.phone.replace(/\\s/g, '')}" class="btn btn-secondary btn-sm" title="Call">
-                    ${window.Icons.phone}
-                  </a>
-                  <a href="https://wa.me/${a.phone.replace(/\\D/g, '')}?text=Hello%20${encodeURIComponent(a.full_name)},%20Atharva%20Enterprises%20regarding%20your%20site%20visit%20appointment%20${a.reference_no}." target="_blank" class="btn btn-whatsapp btn-sm" title="WhatsApp">
-                    WA
-                  </a>
-                </div>
-              </td>
-            </tr>
-          `).join('')}
+          ${apts.map(a => {
+            const isToday = a.appointment_date === todayStr;
+            const waPhone = a.phone.replace(/\\D/g, '');
+            const waText = encodeURIComponent(
+              `Hello ${a.full_name}, this is Atharva Enterprises regarding your scheduled solar site inspection (${a.reference_no}) booked for ${a.appointment_date} (${a.time_slot}) in ${a.city}. Our survey team will coordinate with you. Please let us know if you need any adjustments.`
+            );
+
+            return `
+              <tr>
+                <td>
+                  <strong style="color:#FFFFFF;font-size:0.9rem;">${a.reference_no}</strong><br>
+                  <span style="font-weight:700;color:${isToday ? '#38BDF8' : '#CBD5E1'};font-size:0.85rem;">
+                    📅 ${a.appointment_date}
+                  </span>
+                  ${isToday ? '<span class="badge" style="background:#EF4444;color:#FFFFFF;font-size:0.65rem;margin-left:4px;padding:0.15rem 0.4rem;">TODAY</span>' : ''}
+                </td>
+                <td>
+                  <span class="badge" style="background:rgba(56,189,248,0.15);color:#38BDF8;border:1px solid rgba(56,189,248,0.3);font-size:0.75rem;white-space:nowrap;">
+                    ⏰ ${a.time_slot}
+                  </span>
+                </td>
+                <td>
+                  <strong style="color:#FFFFFF;font-size:0.95rem;">${a.full_name}</strong><br>
+                  <span style="font-size:0.825rem;color:#94A3B8;font-family:monospace;">📞 ${a.phone}</span><br>
+                  <span style="font-size:0.75rem;color:#34D399;font-weight:700;">📍 ${a.city} (${(a.property_type || '').toUpperCase()})</span>
+                </td>
+                <td>
+                  <span class="badge" style="background:rgba(255,255,255,0.08);color:#F1F5F9;font-size:0.725rem;font-weight:700;text-transform:uppercase;">
+                    ${(a.meeting_type || 'site_visit').replace('_', ' ')}
+                  </span>
+                </td>
+                <td style="max-width:220px;">
+                  ${a.bill_range ? `<span style="font-size:0.75rem;color:#FBBF24;font-weight:700;">⚡ Bill: ${a.bill_range}</span><br>` : ''}
+                  <span style="font-size:0.78rem;color:#94A3B8;line-height:1.35;display:block;">
+                    ${a.requirements ? a.requirements.slice(0, 65) + (a.requirements.length > 65 ? '...' : '') : 'No special notes'}
+                  </span>
+                  ${a.admin_notes ? `<span style="font-size:0.72rem;color:#34D399;display:block;margin-top:2px;">📝 Note: ${a.admin_notes}</span>` : ''}
+                </td>
+                <td>
+                  <select class="form-select admin-dark-input" style="font-size:0.8rem;padding:0.4rem 0.65rem;font-weight:700;border-radius:8px;color:${
+                    a.status === 'confirmed' ? '#34D399' : a.status === 'pending' ? '#FBBF24' : a.status === 'completed' ? '#38BDF8' : '#EF4444'
+                  };" onchange="window.updateAppointmentStatus(${a.id}, this.value)">
+                    <option value="pending" ${a.status === 'pending' ? 'selected' : ''}>⏳ Pending</option>
+                    <option value="confirmed" ${a.status === 'confirmed' ? 'selected' : ''}>✅ Confirmed</option>
+                    <option value="completed" ${a.status === 'completed' ? 'selected' : ''}>🏁 Completed</option>
+                    <option value="cancelled" ${a.status === 'cancelled' ? 'selected' : ''}>❌ Cancelled</option>
+                    <option value="rejected" ${a.status === 'rejected' ? 'selected' : ''}>🚫 Rejected</option>
+                  </select>
+                </td>
+                <td>
+                  <div style="display:flex;gap:0.45rem;align-items:center;">
+                    <a href="https://wa.me/${waPhone}?text=${waText}" target="_blank" class="btn btn-sm" style="background:#25D366;color:#FFFFFF;padding:0.4rem 0.65rem;border-radius:7px;font-size:0.75rem;display:inline-flex;align-items:center;gap:0.25rem;" title="Chat with customer on WhatsApp">
+                      💬 WA
+                    </a>
+                    <a href="tel:${a.phone.replace(/\\s/g, '')}" class="btn btn-sm" style="background:#0F1D33;color:#F1F5F9;border:1px solid rgba(255,255,255,0.2);padding:0.4rem 0.65rem;border-radius:7px;" title="Direct Call">
+                      ${window.Icons.phone}
+                    </a>
+                    <button class="btn btn-sm" style="background:#1E293B;color:#CBD5E1;border:1px solid rgba(255,255,255,0.12);padding:0.4rem 0.55rem;border-radius:7px;font-size:0.75rem;" onclick="window.editAppointmentNotes(${a.id}, '${(a.admin_notes || '').replace(/'/g, "\\'")}')" title="Technician / Survey Notes">
+                      📝 Notes
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
     `;
   }
+
+  window.editAppointmentNotes = function (id, currentNotes) {
+    const modal = document.getElementById('generic-modal');
+    const content = document.getElementById('generic-modal-content');
+
+    content.innerHTML = `
+      <div style="background:#0E1D36;padding:1.5rem;border-radius:14px;color:#FFFFFF;">
+        <h3 style="font-size:1.35rem;font-weight:800;color:#FFFFFF;margin-bottom:0.5rem;">Survey Engineer & Inspection Notes</h3>
+        <p style="color:#94A3B8;font-size:0.825rem;margin-bottom:1.25rem;">Record rooftop inspection details, shadow analysis notes, or quotation status</p>
+        <textarea id="apt-note-text" class="form-textarea admin-dark-input" rows="4" style="margin-bottom:1.25rem;width:100%;">${currentNotes || ''}</textarea>
+        <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+          <button class="btn btn-secondary btn-sm" style="background:#1E293B;color:#CBD5E1;" onclick="window.closeModal()">Cancel</button>
+          <button class="btn btn-primary btn-sm" onclick="window.saveAppointmentNote(${id})">Save Survey Notes</button>
+        </div>
+      </div>
+    `;
+
+    modal.classList.add('active');
+  };
+
+  window.saveAppointmentNote = async function (id) {
+    const adminNotes = document.getElementById('apt-note-text').value;
+    try {
+      const res = await adminFetch(`/api/appointments/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminNotes })
+      });
+      if (res.ok) {
+        window.closeModal();
+        window.showToast('Survey notes saved successfully', 'success');
+        loadAndDisplayAppointments();
+      }
+    } catch (err) {
+      window.showToast('Failed to save notes', 'error');
+    }
+  };
+
+  window.exportAppointmentsCSV = function () {
+    const apts = adminState.appointments || [];
+    if (apts.length === 0) {
+      window.showToast('No appointments to export', 'info');
+      return;
+    }
+    const headers = ['Ref No', 'Date', 'Time Slot', 'Customer Name', 'Phone', 'City', 'Property Type', 'Meeting Type', 'Bill Range', 'Status', 'Requirements', 'Admin Notes'];
+    const rows = apts.map(a => [
+      `"${a.reference_no}"`,
+      `"${a.appointment_date}"`,
+      `"${a.time_slot}"`,
+      `"${a.full_name}"`,
+      `"${a.phone}"`,
+      `"${a.city}"`,
+      `"${a.property_type}"`,
+      `"${a.meeting_type}"`,
+      `"${a.bill_range || ''}"`,
+      `"${a.status}"`,
+      `"${(a.requirements || '').replace(/"/g, '""')}"`,
+      `"${(a.admin_notes || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Atharva_Solar_Bookings_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.showToast('Bookings exported to CSV successfully!', 'success');
+  };
 
   window.updateAppointmentStatus = async function (id, status) {
     try {

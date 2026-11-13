@@ -2098,44 +2098,99 @@ img {
   }
 }
 
-/* Admin Dashboard Specific Styles */
+/* ==========================================================================
+   Standalone Executive Admin Login Screen
+   ========================================================================== */
+.admin-login-screen {
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% 15%, #102447 0%, #060C18 70%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+}
+
+.admin-login-container {
+  background: rgba(13, 27, 51, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1.5px solid rgba(56, 189, 248, 0.25);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 30px rgba(2, 132, 199, 0.15);
+  border-radius: 20px;
+  padding: 2.75rem 2.5rem;
+  max-width: 460px;
+  width: 100%;
+  animation: fadeInScale 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.admin-dark-input {
+  background-color: #070E1B !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.14) !important;
+  color: #FFFFFF !important;
+  border-radius: 10px !important;
+  padding: 0.85rem 1rem !important;
+  font-size: 0.95rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.admin-dark-input:focus {
+  border-color: #38BDF8 !important;
+  box-shadow: 0 0 0 3.5px rgba(56, 189, 248, 0.25) !important;
+  background-color: #091426 !important;
+}
+
+/* ==========================================================================
+   Executive Cyber-Slate & Neon Aurora Admin Portal Styles
+   ========================================================================== */
 .admin-view-wrap {
   display: none;
   min-height: 100vh;
-  background-color: #F1F5F9;
+  background-color: #060D1A;
+  color: #F8FAFC;
 }
 
 .admin-header {
-  background: linear-gradient(90deg, #050B18 0%, #0A1938 100%);
+  background: rgba(9, 19, 37, 0.96);
+  backdrop-filter: blur(16px);
   color: #FFFFFF;
   padding: 1.15rem 2.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1.5px solid rgba(245, 158, 11, 0.3);
+  border-bottom: 1.5px solid rgba(56, 189, 248, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .admin-nav-tabs {
-  background-color: #FFFFFF;
-  border-bottom: 1px solid var(--border-color);
+  background-color: #0A162B;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
   padding: 0 2.25rem;
   display: flex;
-  gap: 1.75rem;
+  gap: 1.5rem;
+  overflow-x: auto;
 }
 
 .admin-tab-btn {
   background: none;
   border: none;
-  padding: 1.15rem 0;
-  font-size: 0.95rem;
+  padding: 1.15rem 0.5rem;
+  font-size: 0.925rem;
   font-weight: 700;
-  color: var(--text-muted);
+  color: #94A3B8;
   cursor: pointer;
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.admin-tab-btn:hover {
+  color: #FFFFFF;
 }
 
 .admin-tab-btn.active {
-  color: var(--solar-green-vivid);
+  color: #00F0FF;
+  font-weight: 850;
 }
 
 .admin-tab-btn.active::after {
@@ -2145,19 +2200,21 @@ img {
   left: 0;
   right: 0;
   height: 3px;
-  background: var(--solar-green-grad);
+  background: linear-gradient(90deg, #00F0FF 0%, #0284C7 100%);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
+  border-radius: 3px;
 }
 
 .admin-content-pane {
   padding: 2.25rem;
-  max-width: 1400px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
 .kpi-cards-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 1.35rem;
+  gap: 1.25rem;
   margin-bottom: 2.25rem;
 }
 
@@ -2168,32 +2225,43 @@ img {
 }
 
 .kpi-card {
-  background-color: #FFFFFF;
-  border-radius: var(--radius-lg);
-  padding: 1.65rem;
-  border: 1.5px solid var(--border-color);
-  box-shadow: var(--shadow-sm);
+  background: linear-gradient(135deg, #0F1E38 0%, #0B172B 100%);
+  border-radius: 14px;
+  padding: 1.5rem;
+  border: 1.5px solid rgba(56, 189, 248, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 .kpi-label {
-  font-size: 0.825rem;
-  color: var(--text-muted);
-  font-weight: 750;
-  margin-bottom: 0.5rem;
+  font-size: 0.775rem;
+  color: #94A3B8;
+  font-weight: 800;
+  margin-bottom: 0.45rem;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .kpi-value {
-  font-size: 2.15rem;
-  font-weight: 900;
-  color: var(--navy-900);
+  font-size: 2.2rem;
+  font-weight: 950;
+  color: #FFFFFF;
+  line-height: 1.1;
+}
+
+.admin-card-pane {
+  background: #0E1D36;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.09);
+  padding: 1.65rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  margin-bottom: 1.75rem;
 }
 
 .admin-table-container {
-  background-color: #FFFFFF;
-  border-radius: var(--radius-lg);
-  border: 1.5px solid var(--border-color);
-  box-shadow: var(--shadow-sm);
+  background: #0E1D36;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   overflow-x: auto;
 }
 
@@ -2205,18 +2273,25 @@ img {
 }
 
 .admin-table th {
-  background-color: #F8FAFC;
-  padding: 0.95rem 1.15rem;
+  background-color: #091426;
+  padding: 1rem 1.15rem;
   font-weight: 800;
-  color: var(--navy-900);
-  border-bottom: 1.5px solid var(--border-color);
+  color: #E2E8F0;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.12);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
 }
 
 .admin-table td {
   padding: 1.05rem 1.15rem;
-  border-bottom: 1px solid var(--border-light);
-  color: var(--text-main);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: #F8FAFC;
   vertical-align: middle;
+}
+
+.admin-table tbody tr:hover {
+  background: rgba(56, 189, 248, 0.04);
 }
 
 .status-badge {
