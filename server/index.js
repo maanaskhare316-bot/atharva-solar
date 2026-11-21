@@ -1,6 +1,7 @@
 /**
  * Atharva Enterprises - Core Web Server & REST API
  * Native Node.js HTTP Server + SQLite + RESTful API
+ * Upgraded Secure Online Meeting Booking Architecture
  */
 
 const http = require('node:http');
@@ -8,17 +9,24 @@ const url = require('node:url');
 const path = require('node:path');
 const fs = require('node:fs');
 const { db, getSettings, updateSetting, recordVisit, getVisitorAnalytics } = require('./db');
-const { authenticate, validateSession, revokeSession, changePassword } = require('./auth');
+const { authenticate, validateSession, revokeSession, changePassword, checkRateLimit } = require('./auth');
 const {
-  isValidIndianPhone,
-  formatPhone,
-  getWhatsAppDigits,
-  generateRefNumber,
-  STANDARD_TIME_SLOTS
+  isValidEmail,
+  sanitizeText,
+  generateSecureRefNumber,
+  STANDARD_TIME_SLOTS,
+  MEETING_TYPES,
+  VALID_STATUSES
 } = require('./validators');
+const {
+  generateGoogleMeetUrl,
+  sendBookingReceivedEmail,
+  sendMeetingApprovedEmail
+} = require('./email');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=UTF-8',
@@ -34,16 +42,45 @@ const MIME_TYPES = {
   '.woff2': 'font/woff2'
 };
 
+// Rate limiter for public status lookups (IP -> { count, resetTime })
+const lookupRateLimits = new Map();
+
 /**
- * Helper to parse JSON body
+ * Apply Comprehensive Security Headers to all responses
+ */
+function addSecurityHeaders(res) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; frame-ancestors 'none';"
+  );
+  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
+}
+
+/**
+ * Extract Client IP safely
+ */
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.socket.remoteAddress || '127.0.0.1';
+}
+
+/**
+ * Helper to parse JSON body with strict size limit
  */
 function parseRequestBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
     req.on('data', chunk => {
       body += chunk;
-      // 2MB max payload limit
-      if (body.length > 2 * 1024 * 1024) {
+      // 1MB max payload limit
+      if (body.length > 1024 * 1024) {
         req.destroy();
         reject(new Error('Payload too large'));
       }
@@ -52,7 +89,7 @@ function parseRequestBody(req) {
       if (!body) return resolve({});
       try {
         resolve(JSON.parse(body));
-      } catch (err) {
+      } catch {
         resolve({});
       }
     });
@@ -61,12 +98,13 @@ function parseRequestBody(req) {
 }
 
 /**
- * Send JSON response
+ * Send JSON response with security headers
  */
 function sendJSON(res, statusCode, data) {
+  addSecurityHeaders(res);
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=UTF-8',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
   });
@@ -84,9 +122,21 @@ function getAuthUser(req) {
 }
 
 /**
+ * Mask customer name for privacy (e.g. "Rajesh Sharma" -> "Rajesh S.")
+ */
+function maskCustomerName(fullName) {
+  if (!fullName) return 'Customer';
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  const firstName = parts[0];
+  const lastInitial = parts[parts.length - 1].charAt(0).toUpperCase();
+  return `${firstName} ${lastInitial}.`;
+}
+
+/**
  * Solar Subsidy & Savings Calculator Logic (PM Surya Ghar Muft Bijli Yojana aligned)
  */
-function calculateSolarPlan(monthlyBill, sanctionedLoadKw = null) {
+function calculateSolarPlan(monthlyBill) {
   const bill = parseFloat(monthlyBill) || 3000;
   // Average tariff in MP: approx ₹7.5 per unit
   const estimatedUnitsPerMonth = bill / 7.5;
@@ -94,16 +144,12 @@ function calculateSolarPlan(monthlyBill, sanctionedLoadKw = null) {
 
   // 1 kW generates approx 4 units per day in Central India (MP average)
   let recommendedKw = unitsPerDay / 4;
-  // Round to nearest 0.5 kW, minimum 1 kW, max 100 kW
   recommendedKw = Math.max(1, Math.round(recommendedKw * 2) / 2);
 
   // Roof space needed: ~80 to 100 sq.ft per kW
   const roofAreaSqFt = Math.round(recommendedKw * 95);
 
-  // Government Subsidy Calculation (PM Surya Ghar scheme rules)
-  // Up to 1 kW: ₹30,000
-  // Up to 2 kW: ₹60,000
-  // 3 kW and above: ₹78,000 (Maximum cap for residential rooftop)
+  // Government Subsidy Calculation
   let subsidyAmount = 0;
   if (recommendedKw >= 3) {
     subsidyAmount = 78000;
@@ -113,12 +159,10 @@ function calculateSolarPlan(monthlyBill, sanctionedLoadKw = null) {
     subsidyAmount = 30000;
   }
 
-  // Estimated gross turnkey benchmark cost: ~₹55,000 to ₹65,000 per kW
   const benchmarkCostPerKw = 60000;
   const estimatedGrossCost = Math.round(recommendedKw * benchmarkCostPerKw);
   const netEstimatedCost = Math.max(0, estimatedGrossCost - subsidyAmount);
 
-  // Annual savings: units * 12 months * ₹7.5/unit
   const annualSavings = Math.round(recommendedKw * 4 * 365 * 7.5);
   const paybackPeriodYears = (netEstimatedCost / Math.max(annualSavings, 1)).toFixed(1);
   const lifetime25YearSavings = Math.round((annualSavings * 25) - netEstimatedCost);
@@ -145,11 +189,13 @@ const server = http.createServer(async (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
   const method = req.method.toUpperCase();
+  const clientIp = getClientIp(req);
 
   // Handle CORS preflight
   if (method === 'OPTIONS') {
+    addSecurityHeaders(res);
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
     });
@@ -165,24 +211,47 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, {
       status: 'healthy',
       app: 'Atharva Enterprises Solar Web App',
-      uptime: process.uptime(),
+      secureBooking: true,
       timestamp: new Date().toISOString()
     });
   }
 
-  // 2. Settings & Company Info
+  // 2. Settings & Company Info (Filtered: zero private contact details in public GET)
   if (pathname === '/api/settings') {
     if (method === 'GET') {
-      const settings = getSettings();
+      const allSettings = getSettings();
+      // Whitelist only safe public settings
+      const safePublicKeys = [
+        'company_name',
+        'tagline',
+        'business_description',
+        'market',
+        'office_address',
+        'pwd_license_info',
+        'subsidy_deadline',
+        'subsidy_max_amount',
+        'subsidy_disclaimer',
+        'meeting_platform',
+        'booking_advance_days'
+      ];
+      const settings = {};
+      for (const k of safePublicKeys) {
+        if (allSettings[k] !== undefined) {
+          settings[k] = allSettings[k];
+        }
+      }
       return sendJSON(res, 200, { success: true, settings });
     }
+
     if (method === 'POST' || method === 'PUT') {
       const user = getAuthUser(req);
       if (!user) return sendJSON(res, 401, { error: 'Unauthorized' });
 
       const body = await parseRequestBody(req);
       for (const [key, val] of Object.entries(body)) {
-        updateSetting(key, String(val));
+        // Disallow setting public phone/whatsapp
+        if (['phone', 'whatsapp', 'whatsapp_digits'].includes(key)) continue;
+        updateSetting(key, sanitizeText(String(val), 1000));
       }
       return sendJSON(res, 200, { success: true, message: 'Settings updated successfully' });
     }
@@ -210,7 +279,7 @@ const server = http.createServer(async (req, res) => {
       db.prepare('UPDATE brands SET available = ? WHERE id = ?').run(body.available ? 1 : 0, brandId);
     }
     if (body.tagline !== undefined) {
-      db.prepare('UPDATE brands SET tagline = ? WHERE id = ?').run(body.tagline, brandId);
+      db.prepare('UPDATE brands SET tagline = ? WHERE id = ?').run(sanitizeText(body.tagline, 200), brandId);
     }
     return sendJSON(res, 200, { success: true, message: 'Brand updated' });
   }
@@ -232,10 +301,10 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, { success: true, result });
   }
 
-  // 6. Available Time Slots for Date
+  // 6. Available Time Slots for Meeting Date
   if (pathname === '/api/slots/available' && method === 'GET') {
     const date = parsedUrl.query.date;
-    if (!date) {
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return sendJSON(res, 400, { error: 'Query parameter date (YYYY-MM-DD) is required' });
     }
 
@@ -245,7 +314,7 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, {
         date,
         isBlocked: true,
-        reason: dayBlocked.reason || 'This date is not available for appointments',
+        reason: dayBlocked.reason || 'This date is not available for online meetings',
         availableSlots: []
       });
     }
@@ -269,14 +338,14 @@ const server = http.createServer(async (req, res) => {
       allSlots: STANDARD_TIME_SLOTS.map(slot => ({
         slot,
         isAvailable: !unavailable.has(slot),
-        reason: unavailable.has(slot) ? 'Already reserved or unavailable' : 'Available'
+        reason: unavailable.has(slot) ? 'Reserved' : 'Available'
       }))
     });
   }
 
-  // 7. Appointments API
+  // 7. Customer Online Meeting Booking API
   if (pathname === '/api/appointments') {
-    // GET: Admin views all appointments, or filtered by date / status
+    // GET: Admin views all appointments
     if (method === 'GET') {
       const user = getAuthUser(req);
       if (!user) {
@@ -297,12 +366,11 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { success: true, appointments });
     }
 
-    // POST: Create a new appointment
+    // POST: Public Online Meeting Booking Request
     if (method === 'POST') {
       const body = await parseRequestBody(req);
       const {
         fullName,
-        phone,
         email,
         city,
         propertyType,
@@ -313,21 +381,29 @@ const server = http.createServer(async (req, res) => {
         requirements
       } = body;
 
-      // Basic validations
-      if (!fullName || !fullName.trim()) {
-        return sendJSON(res, 400, { error: 'Full name is required' });
-      }
-      if (!isValidIndianPhone(phone)) {
-        return sendJSON(res, 400, { error: 'Please provide a valid 10-digit Indian mobile number' });
-      }
-      if (!city || !city.trim()) {
-        return sendJSON(res, 400, { error: 'City / Location is required' });
-      }
-      if (!appointmentDate || !timeSlot) {
-        return sendJSON(res, 400, { error: 'Preferred date and time slot are required' });
+      // 1. Validate Full Name
+      const cleanName = sanitizeText(fullName, 100);
+      if (!cleanName || cleanName.length < 2) {
+        return sendJSON(res, 400, { error: 'Please provide your full name (minimum 2 characters)' });
       }
 
-      // Prevent past dates
+      // 2. Validate Email (Strictly Required for private meeting link transmission)
+      const cleanEmail = (email || '').trim().toLowerCase();
+      if (!isValidEmail(cleanEmail)) {
+        return sendJSON(res, 400, { error: 'A valid email address is required to receive your private meeting link' });
+      }
+
+      // 3. Validate Meeting Type
+      const cleanMeetingType = (meetingType || '').trim();
+      if (!MEETING_TYPES[cleanMeetingType]) {
+        return sendJSON(res, 400, { error: 'Please select a valid consultation meeting type' });
+      }
+
+      // 4. Validate Date
+      if (!appointmentDate || !/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)) {
+        return sendJSON(res, 400, { error: 'Valid appointment date (YYYY-MM-DD) is required' });
+      }
+
       const appointmentDay = new Date(appointmentDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -335,7 +411,18 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 400, { error: 'Appointment date cannot be in the past' });
       }
 
-      // Check double-booking
+      const maxFutureDate = new Date();
+      maxFutureDate.setDate(maxFutureDate.getDate() + 45);
+      if (appointmentDay > maxFutureDate) {
+        return sendJSON(res, 400, { error: 'Bookings can be scheduled up to 45 days in advance' });
+      }
+
+      // 5. Validate Time Slot
+      if (!STANDARD_TIME_SLOTS.includes(timeSlot)) {
+        return sendJSON(res, 400, { error: 'Please choose an available meeting time slot' });
+      }
+
+      // 6. Prevent Double-Booking (Atomic Check)
       const existing = db.prepare(`
         SELECT id FROM appointments
         WHERE appointment_date = ? AND time_slot = ? AND status IN ('pending', 'confirmed')
@@ -343,11 +430,11 @@ const server = http.createServer(async (req, res) => {
 
       if (existing) {
         return sendJSON(res, 409, {
-          error: 'This time slot has already been booked. Please choose an alternate slot or date.'
+          error: 'The requested time slot has just been reserved. Please select another slot or date.'
         });
       }
 
-      // Check blocked slots
+      // 7. Check Blocked Slots
       const isBlocked = db.prepare(`
         SELECT id, reason FROM blocked_slots
         WHERE block_date = ? AND (time_slot IS NULL OR time_slot = '' OR time_slot = ?)
@@ -359,8 +446,12 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      const refNo = generateRefNumber('AE-APT');
-      const formattedPhone = formatPhone(phone);
+      // Generate unpredictable, secure reference number
+      const refNo = generateSecureRefNumber('AE-MTG');
+      const cleanCity = sanitizeText(city, 80);
+      const cleanProperty = ['residential', 'commercial', 'industrial'].includes(propertyType) ? propertyType : 'residential';
+      const cleanBill = sanitizeText(billRange, 50);
+      const cleanRequirements = sanitizeText(requirements, 500);
 
       const stmt = db.prepare(`
         INSERT INTO appointments (
@@ -371,84 +462,107 @@ const server = http.createServer(async (req, res) => {
 
       stmt.run(
         refNo,
-        fullName.trim(),
-        formattedPhone,
-        email ? email.trim() : null,
-        city.trim(),
-        propertyType || 'residential',
-        meetingType || 'site_visit',
+        cleanName,
+        '',
+        cleanEmail,
+        cleanCity,
+        cleanProperty,
+        cleanMeetingType,
         appointmentDate,
         timeSlot,
-        billRange || 'Not specified',
-        requirements ? requirements.trim() : ''
+        cleanBill,
+        cleanRequirements
       );
 
-      // Create WhatsApp message link for user convenience
-      const meetingTypeLabels = {
-        site_visit: 'Free Site Visit & Roof Inspection',
-        office_meeting: 'Office Consultation',
-        online_consultation: 'Online Video / Phone Consultation'
-      };
-
-      const waText = encodeURIComponent(
-        `Hello Atharva Enterprises, I have booked a ${meetingTypeLabels[meetingType] || 'meeting'} on your website.\n\n` +
-        `*Reference No:* ${refNo}\n` +
-        `*Name:* ${fullName.trim()}\n` +
-        `*City:* ${city.trim()}\n` +
-        `*Date:* ${appointmentDate}\n` +
-        `*Slot:* ${timeSlot}\n` +
-        `*Property:* ${propertyType || 'Residential'}\n\n` +
-        `Please confirm my booking.`
-      );
-
-      const whatsappUrl = `https://wa.me/919039005531?text=${waText}`;
+      // Trigger asynchronous email confirmation (non-blocking)
+      sendBookingReceivedEmail({
+        reference_no: refNo,
+        full_name: cleanName,
+        email: cleanEmail,
+        meeting_type: MEETING_TYPES[cleanMeetingType],
+        appointment_date: appointmentDate,
+        time_slot: timeSlot
+      }).catch(err => console.error('Email dispatch error:', err));
 
       return sendJSON(res, 201, {
         success: true,
         referenceNo: refNo,
-        message: 'Your solar consultation appointment has been scheduled successfully!',
-        appointment: {
+        message: 'Your online meeting request has been submitted successfully! An acknowledgment has been sent to your email.',
+        booking: {
           referenceNo: refNo,
-          fullName: fullName.trim(),
-          phone: formattedPhone,
-          city: city.trim(),
+          fullName: cleanName,
+          email: cleanEmail,
           appointmentDate,
           timeSlot,
-          meetingType,
+          meetingType: MEETING_TYPES[cleanMeetingType],
           status: 'pending'
-        },
-        whatsappUrl
+        }
       });
     }
   }
 
-  // Lookup appointment by reference number (Public)
-  if (pathname.startsWith('/api/appointments/lookup') && method === 'GET') {
-    const ref = parsedUrl.query.ref;
-    const phone = parsedUrl.query.phone;
-    if (!ref) {
-      return sendJSON(res, 400, { error: 'Booking reference number is required' });
+  // 8. Secure Customer Booking Status Lookup (Requires Ref ID + Matching Email)
+  if (pathname === '/api/appointments/status-lookup' && method === 'POST') {
+    // Rate limit lookups per IP (max 20 per 10 minutes)
+    const now = Date.now();
+    let rl = lookupRateLimits.get(clientIp);
+    if (!rl || now > rl.resetTime) {
+      rl = { count: 1, resetTime: now + 10 * 60 * 1000 };
+    } else {
+      rl.count += 1;
+    }
+    lookupRateLimits.set(clientIp, rl);
+
+    if (rl.count > 20) {
+      return sendJSON(res, 429, { error: 'Too many lookup attempts. Please try again in a few minutes.' });
     }
 
-    let appointment;
-    if (phone) {
-      const cleanPhoneDigits = phone.replace(/\D/g, '').slice(-10);
-      appointment = db.prepare(`
-        SELECT * FROM appointments
-        WHERE reference_no = ? AND phone LIKE ?
-      `).get(ref.trim(), `%${cleanPhoneDigits}%`);
-    } else {
-      appointment = db.prepare('SELECT reference_no, full_name, city, meeting_type, appointment_date, time_slot, status FROM appointments WHERE reference_no = ?').get(ref.trim());
+    const body = await parseRequestBody(req);
+    const ref = (body.referenceNo || '').trim();
+    const email = (body.email || '').trim().toLowerCase();
+
+    if (!ref || !email) {
+      return sendJSON(res, 400, { error: 'Both Booking Reference ID and registered email are required' });
     }
+
+    const appointment = db.prepare(`
+      SELECT reference_no, full_name, email, meeting_type, appointment_date, time_slot, status, meeting_link, requirements
+      FROM appointments
+      WHERE UPPER(reference_no) = UPPER(?) AND LOWER(email) = LOWER(?)
+    `).get(ref, email);
 
     if (!appointment) {
-      return sendJSON(res, 404, { error: 'No matching appointment found' });
+      return sendJSON(res, 404, {
+        error: 'No matching booking found. Please check your Reference ID and registered email address.'
+      });
     }
 
-    return sendJSON(res, 200, { success: true, appointment });
+    // Mask customer name for privacy
+    const maskedName = maskCustomerName(appointment.full_name);
+    const isConfirmed = appointment.status === 'confirmed';
+    const hasMeetingLink = Boolean(appointment.meeting_link && isConfirmed);
+
+    return sendJSON(res, 200, {
+      success: true,
+      referenceNo: appointment.reference_no,
+      maskedName,
+      meetingType: MEETING_TYPES[appointment.meeting_type] || appointment.meeting_type,
+      appointmentDate: appointment.appointment_date,
+      timeSlot: appointment.time_slot,
+      status: appointment.status,
+      hasMeetingLink,
+      // Private message to user; link is delivered securely via email or displayed upon exact verification
+      meetingNotice: isConfirmed
+        ? 'Your online meeting is confirmed. The Google Meet link has been dispatched to your email.'
+        : appointment.status === 'pending'
+        ? 'Your request is currently under review by our engineering team.'
+        : `Meeting status: ${appointment.status.toUpperCase()}`,
+      // Only include direct link if confirmed AND customer has authenticated with exact matching email
+      privateMeetingUrl: hasMeetingLink ? appointment.meeting_link : null
+    });
   }
 
-  // Update appointment status / notes (Admin)
+  // 9. Admin Update Appointment (Status, Meeting Link, Reschedule, Notes)
   if (pathname.startsWith('/api/appointments/') && method === 'PATCH') {
     const user = getAuthUser(req);
     if (!user) return sendJSON(res, 401, { error: 'Unauthorized' });
@@ -456,20 +570,89 @@ const server = http.createServer(async (req, res) => {
     const id = parseInt(pathname.split('/')[3], 10);
     const body = await parseRequestBody(req);
 
-    const existing = db.prepare('SELECT id FROM appointments WHERE id = ?').get(id);
+    const existing = db.prepare('SELECT * FROM appointments WHERE id = ?').get(id);
     if (!existing) return sendJSON(res, 404, { error: 'Appointment not found' });
 
-    if (body.status) {
+    // Handle rescheduling
+    const targetDate = body.rescheduleDate || body.appointmentDate;
+    const targetSlot = body.rescheduleSlot || body.timeSlot;
+    if (targetDate && targetSlot) {
+
+      // Double check availability
+      const conflict = db.prepare(`
+        SELECT id FROM appointments
+        WHERE appointment_date = ? AND time_slot = ? AND status IN ('pending', 'confirmed') AND id != ?
+      `).get(targetDate, targetSlot, id);
+
+      if (conflict) {
+        return sendJSON(res, 409, { error: 'Target slot is already booked for that date' });
+      }
+
+      db.prepare(`
+        UPDATE appointments
+        SET appointment_date = ?, time_slot = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(targetDate, targetSlot, id);
+    }
+
+    // Handle status update
+    if (body.status && VALID_STATUSES.includes(body.status)) {
       db.prepare('UPDATE appointments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(body.status, id);
     }
+
+    // Handle meeting link update
+    if (body.meetingLink !== undefined) {
+      const cleanLink = sanitizeText(body.meetingLink, 300);
+      db.prepare(`
+        UPDATE appointments
+        SET meeting_link = ?, meeting_link_sent_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(cleanLink || null, id);
+
+      // If appointment is confirmed and link is supplied, send confirmation email
+      if (cleanLink && (body.status === 'confirmed' || existing.status === 'confirmed')) {
+        sendMeetingApprovedEmail(
+          { ...existing, meeting_type: MEETING_TYPES[existing.meeting_type] || existing.meeting_type },
+          cleanLink
+        ).catch(err => console.error('Email send error:', err));
+      }
+    }
+
+    // Handle internal admin notes
     if (body.adminNotes !== undefined) {
-      db.prepare('UPDATE appointments SET admin_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(body.adminNotes, id);
+      db.prepare('UPDATE appointments SET admin_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(
+        sanitizeText(body.adminNotes, 1000),
+        id
+      );
     }
 
     return sendJSON(res, 200, { success: true, message: 'Appointment updated successfully' });
   }
 
-  // Block dates / slots (Admin)
+  // 10. Admin Helper: Auto-Generate Google Meet Room Link
+  if (pathname.startsWith('/api/appointments/') && pathname.endsWith('/generate-meet') && method === 'POST') {
+    const user = getAuthUser(req);
+    if (!user) return sendJSON(res, 401, { error: 'Unauthorized' });
+
+    const id = parseInt(pathname.split('/')[3], 10);
+    const existing = db.prepare('SELECT id, email, full_name, meeting_type, appointment_date, time_slot FROM appointments WHERE id = ?').get(id);
+    if (!existing) return sendJSON(res, 404, { error: 'Appointment not found' });
+
+    const meetUrl = generateGoogleMeetUrl();
+    db.prepare(`
+      UPDATE appointments
+      SET meeting_link = ?, meeting_link_sent_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(meetUrl, id);
+
+    return sendJSON(res, 200, {
+      success: true,
+      meetingLink: meetUrl,
+      message: 'Google Meet link generated and assigned.'
+    });
+  }
+
+  // 11. Block dates / slots (Admin)
   if (pathname === '/api/blocked-slots') {
     if (method === 'GET') {
       const user = getAuthUser(req);
@@ -488,7 +671,7 @@ const server = http.createServer(async (req, res) => {
       db.prepare(`
         INSERT INTO blocked_slots (block_date, time_slot, reason)
         VALUES (?, ?, ?)
-      `).run(blockDate, timeSlot || null, reason || 'Blocked by Admin');
+      `).run(blockDate, timeSlot || null, sanitizeText(reason, 200) || 'Blocked by Admin');
 
       return sendJSON(res, 201, { success: true, message: 'Date/Slot blocked successfully' });
     }
@@ -502,7 +685,7 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, { success: true, message: 'Unblocked successfully' });
   }
 
-  // 8. Customer Enquiries & Lead Management
+  // 12. Confidential Customer Leads & General Enquiries
   if (pathname === '/api/enquiries') {
     // GET: Admin leads list
     if (method === 'GET') {
@@ -525,7 +708,7 @@ const server = http.createServer(async (req, res) => {
         params.push(statusFilter);
       }
       if (search && search.trim()) {
-        query += ' AND (name LIKE ? OR phone LIKE ? OR city LIKE ? OR reference_no LIKE ?)';
+        query += ' AND (name LIKE ? OR email LIKE ? OR city LIKE ? OR reference_no LIKE ?)';
         const term = `%${search.trim()}%`;
         params.push(term, term, term, term);
       }
@@ -536,13 +719,12 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { success: true, enquiries });
     }
 
-    // POST: Public enquiry submission
+    // POST: Public General Message / Subsidy Enquiry
     if (method === 'POST') {
       const body = await parseRequestBody(req);
       const {
-        type, // 'quote', 'callback', 'subsidy_check', 'brand_inquiry', 'general_contact'
+        type,
         name,
-        phone,
         email,
         city,
         state,
@@ -554,56 +736,45 @@ const server = http.createServer(async (req, res) => {
         message
       } = body;
 
-      if (!name || !name.trim()) {
-        return sendJSON(res, 400, { error: 'Name is required' });
-      }
-      if (!isValidIndianPhone(phone)) {
-        return sendJSON(res, 400, { error: 'Please enter a valid 10-digit Indian phone number' });
+      const cleanName = sanitizeText(name, 100);
+      if (!cleanName || cleanName.length < 2) {
+        return sendJSON(res, 400, { error: 'Please enter your name' });
       }
 
-      const refNo = generateRefNumber('AE-ENQ');
-      const formattedPhone = formatPhone(phone);
+      const cleanEmail = (email || '').trim().toLowerCase();
+      if (cleanEmail && !isValidEmail(cleanEmail)) {
+        return sendJSON(res, 400, { error: 'Please enter a valid email address' });
+      }
+
+      const refNo = generateSecureRefNumber('AE-ENQ');
 
       const stmt = db.prepare(`
         INSERT INTO enquiries (
-          reference_no, type, name, phone, email, city, state,
+          reference_no, type, name, email, city, state,
           property_type, monthly_bill, solar_capacity_kw, brand_interest,
           service_interest, message, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')
       `);
 
       stmt.run(
         refNo,
-        type || 'general_contact',
-        name.trim(),
-        formattedPhone,
-        email ? email.trim() : null,
-        city ? city.trim() : 'Madhya Pradesh',
-        state || 'Madhya Pradesh',
-        propertyType || 'residential',
+        sanitizeText(type, 50) || 'general_enquiry',
+        cleanName,
+        cleanEmail || null,
+        sanitizeText(city, 80) || 'Madhya Pradesh',
+        sanitizeText(state, 50) || 'Madhya Pradesh',
+        sanitizeText(propertyType, 30) || 'residential',
         monthlyBill ? parseFloat(monthlyBill) : null,
         solarCapacityKw ? parseFloat(solarCapacityKw) : null,
-        brandInterest || null,
-        serviceInterest || null,
-        message ? message.trim() : ''
-      );
-
-      // Pre-filled WhatsApp response link
-      const waMessage = encodeURIComponent(
-        `Hello Atharva Enterprises, I submitted an enquiry for ${type || 'solar services'}.\n\n` +
-        `*Reference:* ${refNo}\n` +
-        `*Name:* ${name.trim()}\n` +
-        (brandInterest ? `*Brand Interest:* ${brandInterest}\n` : '') +
-        (serviceInterest ? `*Service:* ${serviceInterest}\n` : '') +
-        (monthlyBill ? `*Monthly Bill:* ₹${monthlyBill}\n` : '') +
-        `Please provide more information and quotation.`
+        sanitizeText(brandInterest, 80) || null,
+        sanitizeText(serviceInterest, 100) || null,
+        sanitizeText(message, 1000) || ''
       );
 
       return sendJSON(res, 201, {
         success: true,
         referenceNo: refNo,
-        message: 'Thank you! Your enquiry has been received. Our team will contact you shortly.',
-        whatsappUrl: `https://wa.me/919039005531?text=${waMessage}`
+        message: 'Thank you! Your enquiry has been received securely. Our team will contact you via your registered email.'
       });
     }
   }
@@ -620,7 +791,10 @@ const server = http.createServer(async (req, res) => {
       db.prepare('UPDATE enquiries SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(body.status, id);
     }
     if (body.notes !== undefined) {
-      db.prepare('UPDATE enquiries SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(body.notes, id);
+      db.prepare('UPDATE enquiries SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(
+        sanitizeText(body.notes, 1000),
+        id
+      );
     }
 
     return sendJSON(res, 200, { success: true, message: 'Enquiry updated' });
@@ -633,7 +807,7 @@ const server = http.createServer(async (req, res) => {
 
     const enquiries = db.prepare('SELECT * FROM enquiries ORDER BY created_at DESC').all();
 
-    let csv = 'Reference No,Date,Type,Name,Phone,Email,City,Property Type,Monthly Bill (INR),Capacity (kW),Brand Interest,Service,Status,Notes\r\n';
+    let csv = 'Reference No,Date,Type,Name,Email,City,Property Type,Monthly Bill (INR),Capacity (kW),Brand Interest,Service,Status,Notes\r\n';
 
     for (const e of enquiries) {
       const escape = (str) => `"${(str || '').toString().replace(/"/g, '""')}"`;
@@ -642,7 +816,6 @@ const server = http.createServer(async (req, res) => {
         escape(e.created_at),
         escape(e.type),
         escape(e.name),
-        escape(e.phone),
         escape(e.email),
         escape(e.city),
         escape(e.property_type),
@@ -657,18 +830,32 @@ const server = http.createServer(async (req, res) => {
 
     res.writeHead(200, {
       'Content-Type': 'text/csv; charset=UTF-8',
-      'Content-Disposition': 'attachment; filename="atharva_solar_leads.csv"'
+      'Content-Disposition': 'attachment; filename="atharva_solar_enquiries.csv"'
     });
     return res.end(csv);
   }
 
-  // 9. Admin Authentication
+  // 13. Admin Authentication with Rate Limiting & Audit Logging
   if (pathname === '/api/admin/login' && method === 'POST') {
     const body = await parseRequestBody(req);
-    const result = authenticate(body.email, body.password);
-    if (!result) {
-      return sendJSON(res, 401, { error: 'Invalid email address or password' });
+    const result = authenticate(body.email, body.password, clientIp);
+
+    // Record login attempt audit
+    try {
+      db.prepare(`
+        INSERT INTO login_attempts (ip_address, email, success)
+        VALUES (?, ?, ?)
+      `).run(clientIp, sanitizeText(body.email, 100) || '', result.success ? 1 : 0);
+    } catch {}
+
+    if (result.locked) {
+      return sendJSON(res, 429, { error: result.error, locked: true });
     }
+
+    if (!result.success) {
+      return sendJSON(res, 401, { error: result.error });
+    }
+
     return sendJSON(res, 200, {
       success: true,
       token: result.token,
@@ -705,7 +892,7 @@ const server = http.createServer(async (req, res) => {
     const totalAppointments = db.prepare('SELECT COUNT(*) as c FROM appointments').get().c;
     const confirmedAppointments = db.prepare("SELECT COUNT(*) as c FROM appointments WHERE status = 'confirmed'").get().c;
     const pendingAppointments = db.prepare("SELECT COUNT(*) as c FROM appointments WHERE status = 'pending'").get().c;
-    const completedSiteVisits = db.prepare("SELECT COUNT(*) as c FROM appointments WHERE status = 'completed'").get().c;
+    const completedMeetings = db.prepare("SELECT COUNT(*) as c FROM appointments WHERE status = 'completed'").get().c;
 
     return sendJSON(res, 200, {
       success: true,
@@ -715,12 +902,12 @@ const server = http.createServer(async (req, res) => {
         totalAppointments,
         confirmedAppointments,
         pendingAppointments,
-        completedSiteVisits
+        completedMeetings
       }
     });
   }
 
-  // 10. Visitor Traffic Analytics (Admin Only)
+  // 14. Visitor Traffic Analytics (Admin Only)
   if (pathname === '/api/admin/analytics' && method === 'GET') {
     const user = getAuthUser(req);
     if (!user) return sendJSON(res, 401, { error: 'Unauthorized' });
@@ -728,7 +915,7 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, { success: true, analytics });
   }
 
-  // 11. Change Admin Password (Admin Only)
+  // 15. Change Admin Password (Admin Only)
   if (pathname === '/api/admin/change-password' && method === 'POST') {
     const user = getAuthUser(req);
     if (!user) return sendJSON(res, 401, { error: 'Unauthorized' });
@@ -736,22 +923,20 @@ const server = http.createServer(async (req, res) => {
     if (!body.oldPassword || !body.newPassword) {
       return sendJSON(res, 400, { error: 'Both current password and new password are required' });
     }
-    if (body.newPassword.length < 6) {
-      return sendJSON(res, 400, { error: 'New password must be at least 6 characters' });
+    if (body.newPassword.length < 8) {
+      return sendJSON(res, 400, { error: 'New password must be at least 8 characters' });
     }
     const success = changePassword(user.userId, body.oldPassword, body.newPassword);
     if (!success) {
       return sendJSON(res, 400, { error: 'Incorrect current password' });
     }
-    return sendJSON(res, 200, { success: true, message: 'Password updated successfully' });
+    return sendJSON(res, 200, { success: true, message: 'Password updated successfully with PBKDF2 encryption' });
   }
 
-  // 12. Public Visitor Tracking Ping
+  // 16. Anonymous Visitor Tracking Ping
   if (pathname === '/api/analytics/track' && method === 'POST') {
     try {
       const body = await parseRequestBody(req);
-      const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
-      const ip = rawIp.split(',')[0].trim();
       const ua = req.headers['user-agent'] || '';
       let deviceType = 'Desktop';
       if (/mobile|android|iphone/i.test(ua)) {
@@ -761,26 +946,26 @@ const server = http.createServer(async (req, res) => {
       }
 
       recordVisit({
-        visitorId: body.visitorId || 'v_' + Math.random().toString(36).substring(2, 9),
-        ipAddress: ip,
-        userAgent: ua.substring(0, 250),
+        visitorId: sanitizeText(body.visitorId, 64) || 'v_' + Math.random().toString(36).substring(2, 9),
+        ipAddress: clientIp,
+        userAgent: sanitizeText(ua, 250),
         deviceType,
-        pagePath: body.pagePath || '/',
-        referrer: body.referrer || 'Direct'
+        pagePath: sanitizeText(body.pagePath, 150) || '/',
+        referrer: sanitizeText(body.referrer, 150) || 'Direct'
       });
       return sendJSON(res, 200, { success: true });
-    } catch (err) {
+    } catch {
       return sendJSON(res, 200, { success: false });
     }
   }
 
   // -------------------------------------------------------------
-  // STATIC FILE SERVING
+  // STATIC FILE SERVING WITH SECURITY CONTROLS
   // -------------------------------------------------------------
   let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
-
-  // Security check: ensure normalized path stays within PUBLIC_DIR
   const normalizedPath = path.normalize(filePath);
+
+  // Security check: ensure path stays within PUBLIC_DIR
   if (!normalizedPath.startsWith(PUBLIC_DIR)) {
     res.writeHead(403, { 'Content-Type': 'text/plain' });
     return res.end('403 Forbidden');
@@ -788,13 +973,14 @@ const server = http.createServer(async (req, res) => {
 
   fs.stat(normalizedPath, (err, stats) => {
     if (err || !stats.isFile()) {
-      // If client requests a route like /admin, fall back to index.html (SPA routing)
+      // SPA Fallback to index.html
       const indexPath = path.join(PUBLIC_DIR, 'index.html');
       fs.readFile(indexPath, (readErr, content) => {
         if (readErr) {
           res.writeHead(404, { 'Content-Type': 'text/plain' });
           return res.end('404 Not Found');
         }
+        addSecurityHeaders(res);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8' });
         res.end(content);
       });
@@ -809,6 +995,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         return res.end('500 Server Error');
       }
+      addSecurityHeaders(res);
       res.writeHead(200, {
         'Content-Type': contentType,
         'Cache-Control': 'no-cache'
@@ -818,11 +1005,15 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`====================================================`);
-  console.log(`Atharva Enterprises Solar Web Application`);
-  console.log(`A Class Electrical & PWD Contractor`);
-  console.log(`Listening on http://localhost:${PORT}`);
-  console.log(`Protected Admin Route: http://localhost:${PORT}/admin-portal`);
-  console.log(`====================================================`);
-});
+if (require.main === module) {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`====================================================`);
+    console.log(`Atharva Enterprises Solar Web Application`);
+    console.log(`A Class Electrical & PWD Contractor`);
+    console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`====================================================`);
+  });
+}
+
+module.exports = server;
+

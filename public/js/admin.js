@@ -1,6 +1,6 @@
 /**
- * Atharva Enterprises - Admin Dashboard Controller
- * Lead Management, Appointment Approvals, Brand CMS, Slot Blocking & Analytics
+ * Atharva Enterprises - Secure Admin Dashboard Controller
+ * Online Meeting Management, Google Meet Integration, Lead Management, CMS & Security Audit
  */
 
 (function () {
@@ -9,7 +9,7 @@
   const adminState = {
     token: localStorage.getItem('atharva_admin_token') || '',
     user: null,
-    currentTab: 'analytics',
+    currentTab: 'appointments',
     stats: {},
     analytics: {},
     leads: [],
@@ -49,7 +49,7 @@
         renderAdminUI();
         return true;
       }
-    } catch (err) {
+    } catch {
       // not authenticated
     }
     showLoginScreen();
@@ -80,15 +80,15 @@
     window.location.hash = '';
   };
 
-  window.togglePasswordVisibility = function (inputId, btnEl) {
-    const input = document.getElementById(inputId);
-    if (!input) return;
-    if (input.type === 'password') {
-      input.type = 'text';
-      btnEl.textContent = 'Hide Password';
+  window.togglePasswordVisibility = function (inputId, triggerEl) {
+    const el = document.getElementById(inputId);
+    if (!el) return;
+    if (el.type === 'password') {
+      el.type = 'text';
+      triggerEl.textContent = 'Hide Password';
     } else {
-      input.type = 'password';
-      btnEl.textContent = 'Show Password';
+      el.type = 'password';
+      triggerEl.textContent = 'Show Password';
     }
   };
 
@@ -96,6 +96,10 @@
     e.preventDefault();
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Verifying Credentials...';
 
     try {
       const res = await fetch('/api/admin/login', {
@@ -104,44 +108,63 @@
         body: JSON.stringify({ email, password })
       });
       const data = await res.json();
-      if (res.ok && data.success) {
-        adminState.token = data.token;
-        adminState.user = data.user;
-        localStorage.setItem('atharva_admin_token', data.token);
-        window.showToast('Welcome to Atharva Operations Dashboard!', 'success');
-        renderAdminUI();
-      } else {
-        window.showToast(data.error || 'Invalid email or password', 'error');
+
+      if (res.status === 429) {
+        window.showToast(data.error || 'Too many attempts. Account locked temporarily.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign In to Operations Portal';
+        return;
       }
-    } catch (err) {
-      window.showToast('Login error. Please check server.', 'error');
+
+      if (!res.ok || !data.success) {
+        window.showToast(data.error || 'Invalid email or password', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign In to Operations Portal';
+        return;
+      }
+
+      adminState.token = data.token;
+      adminState.user = data.user;
+      localStorage.setItem('atharva_admin_token', data.token);
+
+      window.showToast(`Welcome back, ${data.user.name}!`, 'success');
+      document.getElementById('admin-login-screen').style.display = 'none';
+      renderAdminUI();
+    } catch {
+      window.showToast('Authentication connection error. Please try again.', 'error');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Sign In to Operations Portal';
     }
   };
 
-  window.adminLogout = function () {
-    localStorage.removeItem('atharva_admin_token');
+  window.adminLogout = async function () {
+    try {
+      await fetch('/api/admin/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${adminState.token}`
+        }
+      });
+    } catch {}
+
     adminState.token = '';
     adminState.user = null;
+    localStorage.removeItem('atharva_admin_token');
+    showLoginScreen();
+    window.showToast('Signed out of admin portal', 'info');
+  };
+
+  function renderAdminUI() {
     const loginScreen = document.getElementById('admin-login-screen');
     const adminWrap = document.getElementById('admin-view-wrap');
     const publicWrap = document.getElementById('public-view-wrap');
-    if (loginScreen) loginScreen.style.display = 'none';
-    if (adminWrap) adminWrap.style.display = 'none';
-    if (publicWrap) publicWrap.style.display = 'block';
-    window.location.hash = '';
-    window.showToast('Logged out successfully', 'info');
-  };
 
-  // Render UI and load tabs
-  async function renderAdminUI() {
-    document.getElementById('public-view-wrap').style.display = 'none';
-    const loginScreen = document.getElementById('admin-login-screen');
     if (loginScreen) loginScreen.style.display = 'none';
-    const adminWrap = document.getElementById('admin-view-wrap');
+    if (publicWrap) publicWrap.style.display = 'none';
     if (adminWrap) adminWrap.style.display = 'block';
 
-    await loadStats();
-    switchTab(adminState.currentTab);
+    loadStats();
+    switchTab(adminState.currentTab || 'appointments');
   }
 
   async function loadStats() {
@@ -182,23 +205,567 @@
     });
 
     const pane = document.getElementById('admin-tab-content');
-    if (tab === 'analytics') renderAnalyticsTab(pane);
-    else if (tab === 'appointments') renderAppointmentsTab(pane);
+    if (tab === 'appointments') renderAppointmentsTab(pane);
     else if (tab === 'leads') renderLeadsTab(pane);
+    else if (tab === 'analytics') renderAnalyticsTab(pane);
     else if (tab === 'brands') renderBrandsTab(pane);
     else if (tab === 'security') renderSecurityTab(pane);
-    else if (tab === 'settings') renderSettingsTab(pane);
   }
 
   window.switchAdminTab = switchTab;
 
-  // TAB 1: Leads & Enquiries
+  // TAB 1: Online Meetings & Consultations Command Center
+  async function renderAppointmentsTab(container) {
+    container.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+        <div>
+          <h2 style="font-size:1.55rem;font-weight:900;color:#FFFFFF;letter-spacing:-0.02em;">📅 Online Meeting Bookings & Video Rooms</h2>
+          <p style="font-size:0.875rem;color:#94A3B8;">Approve bookings, assign Google Meet links, reschedule slots, and manage client consultations</p>
+        </div>
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="window.exportAppointmentsCSV()" style="background:#0F1D33;color:#38BDF8;border-color:rgba(56,189,248,0.3);display:inline-flex;align-items:center;gap:0.4rem;">
+            ${window.Icons.download} Export CSV
+          </button>
+          <button class="btn btn-amber btn-sm" onclick="window.openBlockDateModal()">
+            ${window.Icons.calendar} Block Date / Slot
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="window.loadAndDisplayAppointments()">
+            Refresh Bookings
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Status Filter Ribbon & Live Search Bar -->
+      <div class="admin-card-pane" style="margin-bottom:1.5rem;padding:1.25rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+          
+          <!-- Filter Buttons -->
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="appointment-filter-chips">
+            <button class="btn btn-sm" style="background:#0284C7;color:#FFFFFF;border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('all', this)">
+              All Bookings (<span id="count-all-apts">0</span>)
+            </button>
+            <button class="btn btn-sm" style="background:#1E293B;color:#FBBF24;border:1px solid rgba(245,158,11,0.3);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('pending', this)">
+              ⏳ Pending (<span id="count-pending-apts">0</span>)
+            </button>
+            <button class="btn btn-sm" style="background:#1E293B;color:#34D399;border:1px solid rgba(52,211,153,0.3);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('confirmed', this)">
+              ✅ Confirmed (<span id="count-confirmed-apts">0</span>)
+            </button>
+            <button class="btn btn-sm" style="background:#1E293B;color:#38BDF8;border:1px solid rgba(56,189,248,0.3);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('today', this)">
+              📅 Today's Meetings (<span id="count-today-apts">0</span>)
+            </button>
+            <button class="btn btn-sm" style="background:#1E293B;color:#CBD5E1;border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('completed', this)">
+              🏁 Completed (<span id="count-completed-apts">0</span>)
+            </button>
+          </div>
+
+          <!-- Live Search -->
+          <div style="min-width:260px;flex:1;max-width:380px;">
+            <input type="text" id="appointment-search-input" class="form-input admin-dark-input" placeholder="🔍 Search customer, email, ref ID..." oninput="window.filterAppointmentsLive()" style="padding:0.55rem 0.85rem;font-size:0.85rem;">
+          </div>
+        </div>
+      </div>
+
+      <div id="appointments-table-wrap" class="admin-table-container">
+        <div style="padding:2.5rem;text-align:center;color:#94A3B8;">Loading appointments...</div>
+      </div>
+    `;
+
+    await loadAndDisplayAppointments();
+  }
+
+  adminState.appointmentFilter = 'all';
+
+  window.setAppointmentFilter = function (filter, btnEl) {
+    adminState.appointmentFilter = filter;
+    document.querySelectorAll('#appointment-filter-chips button').forEach(b => {
+      b.style.background = '#1E293B';
+    });
+    if (btnEl) btnEl.style.background = '#0284C7';
+    window.filterAppointmentsLive();
+  };
+
+  window.filterAppointmentsLive = function () {
+    const search = (document.getElementById('appointment-search-input')?.value || '').toLowerCase().trim();
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const filtered = (adminState.appointments || []).filter(a => {
+      const matchSearch = !search ||
+        (a.full_name || '').toLowerCase().includes(search) ||
+        (a.email || '').toLowerCase().includes(search) ||
+        (a.city || '').toLowerCase().includes(search) ||
+        (a.reference_no || '').toLowerCase().includes(search);
+
+      let matchFilter = true;
+      if (adminState.appointmentFilter === 'pending') matchFilter = a.status === 'pending';
+      else if (adminState.appointmentFilter === 'confirmed') matchFilter = a.status === 'confirmed';
+      else if (adminState.appointmentFilter === 'completed') matchFilter = a.status === 'completed';
+      else if (adminState.appointmentFilter === 'today') matchFilter = a.appointment_date === todayStr;
+
+      return matchSearch && matchFilter;
+    });
+
+    renderAppointmentsTable(filtered);
+  };
+
+  async function loadAndDisplayAppointments() {
+    try {
+      const res = await adminFetch('/api/appointments');
+      const data = await res.json();
+      if (data.success && data.appointments) {
+        adminState.appointments = data.appointments;
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const elAll = document.getElementById('count-all-apts');
+        if (elAll) elAll.textContent = data.appointments.length;
+        const elPending = document.getElementById('count-pending-apts');
+        if (elPending) elPending.textContent = data.appointments.filter(a => a.status === 'pending').length;
+        const elConfirmed = document.getElementById('count-confirmed-apts');
+        if (elConfirmed) elConfirmed.textContent = data.appointments.filter(a => a.status === 'confirmed').length;
+        const elToday = document.getElementById('count-today-apts');
+        if (elToday) elToday.textContent = data.appointments.filter(a => a.appointment_date === todayStr).length;
+        const elCompleted = document.getElementById('count-completed-apts');
+        if (elCompleted) elCompleted.textContent = data.appointments.filter(a => a.status === 'completed').length;
+
+        renderAppointmentsTable(data.appointments);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  window.loadAndDisplayAppointments = loadAndDisplayAppointments;
+
+  function renderAppointmentsTable(apts) {
+    const wrap = document.getElementById('appointments-table-wrap');
+    if (!wrap) return;
+
+    if (apts.length === 0) {
+      wrap.innerHTML = '<div style="padding:3rem;text-align:center;color:#94A3B8;">No meeting appointments match your filter.</div>';
+      return;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    wrap.innerHTML = `
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Booking Ref / Date</th>
+            <th>Time Slot</th>
+            <th>Customer & Email</th>
+            <th>Consultation Type</th>
+            <th>Google Meet Link</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${apts.map(a => {
+            const isToday = a.appointment_date === todayStr;
+            const hasMeetLink = Boolean(a.meeting_link && a.meeting_link.trim());
+
+            return `
+              <tr>
+                <td>
+                  <strong style="color:#FFFFFF;font-size:0.9rem;font-family:monospace;">${a.reference_no}</strong><br>
+                  <span style="font-weight:700;color:${isToday ? '#38BDF8' : '#CBD5E1'};font-size:0.85rem;">
+                    📅 ${a.appointment_date}
+                  </span>
+                  ${isToday ? '<span class="badge" style="background:#EF4444;color:#FFFFFF;font-size:0.65rem;margin-left:4px;padding:0.15rem 0.4rem;">TODAY</span>' : ''}
+                </td>
+                <td>
+                  <span class="badge" style="background:rgba(56,189,248,0.15);color:#38BDF8;border:1px solid rgba(56,189,248,0.3);font-size:0.75rem;white-space:nowrap;">
+                    ⏰ ${a.time_slot}
+                  </span>
+                </td>
+                <td>
+                  <strong style="color:#FFFFFF;font-size:0.95rem;">${a.full_name}</strong><br>
+                  <span style="font-size:0.825rem;color:#38BDF8;">✉️ ${a.email}</span><br>
+                  <span style="font-size:0.75rem;color:#34D399;font-weight:700;">📍 ${a.city || 'Madhya Pradesh'} (${(a.property_type || 'residential').toUpperCase()})</span>
+                </td>
+                <td>
+                  <span class="badge" style="background:rgba(255,255,255,0.08);color:#F1F5F9;font-size:0.725rem;font-weight:700;text-transform:uppercase;">
+                    ${(a.meeting_type || 'solar_consultation').replace(/_/g, ' ')}
+                  </span>
+                  ${a.bill_range ? `<br><small style="color:#FBBF24;">⚡ ${a.bill_range}</small>` : ''}
+                </td>
+                <td>
+                  ${hasMeetLink ? `
+                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                      <a href="${a.meeting_link}" target="_blank" rel="noopener noreferrer" style="color:#38BDF8;font-size:0.8rem;text-decoration:underline;word-break:break-all;">
+                        ${a.meeting_link.replace('https://meet.google.com/', '')}
+                      </a>
+                      <button class="btn btn-sm" onclick="window.openAssignMeetModal(${a.id}, '${a.meeting_link}')" title="Edit Link" style="background:#1E293B;padding:0.25rem 0.5rem;font-size:0.7rem;color:#CBD5E1;">
+                        ✏️
+                      </button>
+                    </div>
+                  ` : `
+                    <div style="display:flex;gap:0.4rem;">
+                      <button class="btn btn-sm" onclick="window.autoGenerateMeet(${a.id})" style="background:#0284C7;color:#FFFFFF;padding:0.35rem 0.6rem;font-size:0.75rem;" title="Auto generate Google Meet room">
+                        ⚡ Generate Meet
+                      </button>
+                      <button class="btn btn-sm" onclick="window.openAssignMeetModal(${a.id}, '')" style="background:#1E293B;color:#CBD5E1;padding:0.35rem 0.5rem;font-size:0.75rem;">
+                        Paste Link
+                      </button>
+                    </div>
+                  `}
+                </td>
+                <td>
+                  <select class="form-select admin-dark-input" style="font-size:0.8rem;padding:0.4rem 0.65rem;font-weight:700;border-radius:8px;color:${
+                    a.status === 'confirmed' ? '#34D399' : a.status === 'pending' ? '#FBBF24' : a.status === 'completed' ? '#38BDF8' : '#EF4444'
+                  };" onchange="window.updateAppointmentStatus(${a.id}, this.value)">
+                    <option value="pending" ${a.status === 'pending' ? 'selected' : ''}>⏳ Pending</option>
+                    <option value="confirmed" ${a.status === 'confirmed' ? 'selected' : ''}>✅ Confirmed</option>
+                    <option value="completed" ${a.status === 'completed' ? 'selected' : ''}>🏁 Completed</option>
+                    <option value="cancelled" ${a.status === 'cancelled' ? 'selected' : ''}>❌ Cancelled</option>
+                    <option value="rejected" ${a.status === 'rejected' ? 'selected' : ''}>🚫 Rejected</option>
+                  </select>
+                </td>
+                <td>
+                  <div style="display:flex;gap:0.4rem;align-items:center;">
+                    <button class="btn btn-sm" style="background:#0F1D33;color:#38BDF8;border:1px solid rgba(56,189,248,0.3);padding:0.4rem 0.65rem;font-size:0.75rem;" onclick="window.openRescheduleModal(${a.id}, '${a.appointment_date}', '${a.time_slot}')" title="Reschedule Date & Slot">
+                      🔄 Reschedule
+                    </button>
+                    <button class="btn btn-sm" style="background:#1E293B;color:#CBD5E1;border:1px solid rgba(255,255,255,0.12);padding:0.4rem 0.55rem;font-size:0.75rem;" onclick="window.editAppointmentNotes(${a.id}, '${(a.admin_notes || '').replace(/'/g, "\\'")}')" title="Internal Notes">
+                      📝 Notes
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  // Assign or Edit Meeting Link Modal
+  window.openAssignMeetModal = function (id, currentLink) {
+    const modal = document.getElementById('generic-modal');
+    const content = document.getElementById('generic-modal-content');
+
+    content.innerHTML = `
+      <div style="background:#0E1D36;padding:1.75rem;border-radius:14px;color:#FFFFFF;">
+        <h3 style="font-size:1.35rem;font-weight:800;color:#FFFFFF;margin-bottom:0.5rem;">Assign Google Meet Room</h3>
+        <p style="color:#94A3B8;font-size:0.85rem;margin-bottom:1.25rem;">The link will be privately delivered to the customer upon confirmation.</p>
+        
+        <div class="form-group" style="margin-bottom:1.25rem;">
+          <label class="form-label" style="color:#CBD5E1;">Google Meet / Video Room URL</label>
+          <input type="url" id="meet-url-input" class="form-input admin-dark-input" placeholder="https://meet.google.com/xxx-yyyy-zzz" value="${currentLink || ''}">
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem;flex-wrap:wrap;gap:0.75rem;">
+          <button type="button" class="btn btn-sm" onclick="window.autoGenerateMeet(${id})" style="background:#0284C7;color:#FFFFFF;">
+            ⚡ Auto-Generate Google Meet Room
+          </button>
+          <div style="display:flex;gap:0.5rem;">
+            <button class="btn btn-secondary btn-sm" onclick="window.closeModal()" style="background:#1E293B;color:#CBD5E1;">Cancel</button>
+            <button class="btn btn-primary btn-sm" onclick="window.saveMeetLink(${id})">Save Link</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    modal.classList.add('active');
+  };
+
+  window.saveMeetLink = async function (id) {
+    const link = document.getElementById('meet-url-input').value.trim();
+    if (!link) {
+      window.showToast('Please enter a valid meeting URL', 'error');
+      return;
+    }
+
+    try {
+      const res = await adminFetch(`/api/appointments/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingLink: link })
+      });
+      if (res.ok) {
+        window.closeModal();
+        window.showToast('Meeting link assigned successfully', 'success');
+        loadAndDisplayAppointments();
+      }
+    } catch {
+      window.showToast('Failed to save meeting link', 'error');
+    }
+  };
+
+  window.autoGenerateMeet = async function (id) {
+    try {
+      const res = await adminFetch(`/api/appointments/${id}/generate-meet`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        window.closeModal();
+        window.showToast(`Google Meet link generated: ${data.meetingLink}`, 'success');
+        loadAndDisplayAppointments();
+      } else {
+        window.showToast(data.error || 'Failed to generate link', 'error');
+      }
+    } catch {
+      window.showToast('Error generating meeting link', 'error');
+    }
+  };
+
+  // Reschedule Appointment Modal
+  window.openRescheduleModal = async function (id, currentDate, currentSlot) {
+    const modal = document.getElementById('generic-modal');
+    const content = document.getElementById('generic-modal-content');
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const minDate = tomorrow.toISOString().split('T')[0];
+
+    content.innerHTML = `
+      <div style="background:#0E1D36;padding:1.75rem;border-radius:14px;color:#FFFFFF;">
+        <h3 style="font-size:1.35rem;font-weight:800;color:#FFFFFF;margin-bottom:0.5rem;">Reschedule Online Consultation</h3>
+        <p style="color:#94A3B8;font-size:0.85rem;margin-bottom:1.25rem;">Current schedule: 📅 ${currentDate} (${currentSlot})</p>
+
+        <form id="reschedule-form" onsubmit="window.handleRescheduleSubmit(event, ${id})">
+          <div class="form-group" style="margin-bottom:1.25rem;">
+            <label class="form-label" style="color:#CBD5E1;">New Consultation Date <span class="required">*</span></label>
+            <input type="date" id="reschedule-date" class="form-input admin-dark-input" required min="${minDate}" value="${currentDate}" onchange="window.loadRescheduleSlots(this.value)">
+          </div>
+
+          <div class="form-group" style="margin-bottom:1.5rem;">
+            <label class="form-label" style="color:#CBD5E1;">Select New Available Slot <span class="required">*</span></label>
+            <div id="reschedule-slots-container">
+              <span style="font-size:0.85rem;color:#94A3B8;">Checking slot availability...</span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.closeModal()" style="background:#1E293B;color:#CBD5E1;">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Confirm Reschedule</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    modal.classList.add('active');
+    window.loadRescheduleSlots(currentDate);
+  };
+
+  window.loadRescheduleSlots = async function (dateStr) {
+    const container = document.getElementById('reschedule-slots-container');
+    if (!container) return;
+
+    try {
+      const res = await fetch(`/api/slots/available?date=${dateStr}`);
+      const data = await res.json();
+      const slots = data.availableSlots || [];
+
+      if (slots.length === 0) {
+        container.innerHTML = '<span style="color:#F87171;font-size:0.85rem;">No slots available for this date.</span>';
+        return;
+      }
+
+      container.innerHTML = `
+        <select id="reschedule-slot-select" class="form-select admin-dark-input" required>
+          ${slots.map(s => `<option value="${s}">${s}</option>`).join('')}
+        </select>
+      `;
+    } catch {
+      container.innerHTML = '<span style="color:#F87171;font-size:0.85rem;">Error loading slots</span>';
+    }
+  };
+
+  window.handleRescheduleSubmit = async function (e, id) {
+    e.preventDefault();
+    const newDate = document.getElementById('reschedule-date').value;
+    const newSlot = document.getElementById('reschedule-slot-select')?.value;
+
+    if (!newDate || !newSlot) {
+      window.showToast('Please select both a date and an available slot', 'error');
+      return;
+    }
+
+    try {
+      const res = await adminFetch(`/api/appointments/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rescheduleDate: newDate,
+          rescheduleSlot: newSlot
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        window.closeModal();
+        window.showToast(`Meeting rescheduled to ${newDate} (${newSlot})`, 'success');
+        loadAndDisplayAppointments();
+      } else {
+        window.showToast(data.error || 'Reschedule conflict', 'error');
+      }
+    } catch {
+      window.showToast('Network error during reschedule', 'error');
+    }
+  };
+
+  window.editAppointmentNotes = function (id, currentNotes) {
+    const modal = document.getElementById('generic-modal');
+    const content = document.getElementById('generic-modal-content');
+
+    content.innerHTML = `
+      <div style="background:#0E1D36;padding:1.5rem;border-radius:14px;color:#FFFFFF;">
+        <h3 style="font-size:1.35rem;font-weight:800;color:#FFFFFF;margin-bottom:0.5rem;">Consultation & Technical Notes</h3>
+        <p style="color:#94A3B8;font-size:0.825rem;margin-bottom:1.25rem;">Record load requirements, system configuration proposals, or followup actions</p>
+        <textarea id="apt-note-text" class="form-textarea admin-dark-input" rows="4" style="margin-bottom:1.25rem;width:100%;">${currentNotes || ''}</textarea>
+        <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+          <button class="btn btn-secondary btn-sm" style="background:#1E293B;color:#CBD5E1;" onclick="window.closeModal()">Cancel</button>
+          <button class="btn btn-primary btn-sm" onclick="window.saveAppointmentNote(${id})">Save Notes</button>
+        </div>
+      </div>
+    `;
+
+    modal.classList.add('active');
+  };
+
+  window.saveAppointmentNote = async function (id) {
+    const adminNotes = document.getElementById('apt-note-text').value;
+    try {
+      const res = await adminFetch(`/api/appointments/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminNotes })
+      });
+      if (res.ok) {
+        window.closeModal();
+        window.showToast('Consultation notes saved successfully', 'success');
+        loadAndDisplayAppointments();
+      }
+    } catch {
+      window.showToast('Failed to save notes', 'error');
+    }
+  };
+
+  window.updateAppointmentStatus = async function (id, status) {
+    try {
+      const res = await adminFetch(`/api/appointments/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        window.showToast(`Appointment status updated to ${status.toUpperCase()}`, 'success');
+        loadStats();
+      }
+    } catch {
+      window.showToast('Failed to update appointment', 'error');
+    }
+  };
+
+  window.exportAppointmentsCSV = function () {
+    const apts = adminState.appointments || [];
+    if (apts.length === 0) {
+      window.showToast('No appointments to export', 'info');
+      return;
+    }
+    const headers = ['Ref No', 'Date', 'Time Slot', 'Customer Name', 'Email', 'City', 'Property Type', 'Meeting Type', 'Google Meet Link', 'Bill Range', 'Status', 'Requirements', 'Admin Notes'];
+    const rows = apts.map(a => [
+      `"${a.reference_no}"`,
+      `"${a.appointment_date}"`,
+      `"${a.time_slot}"`,
+      `"${a.full_name}"`,
+      `"${a.email}"`,
+      `"${a.city || ''}"`,
+      `"${a.property_type || ''}"`,
+      `"${a.meeting_type || ''}"`,
+      `"${a.meeting_link || ''}"`,
+      `"${a.bill_range || ''}"`,
+      `"${a.status}"`,
+      `"${(a.requirements || '').replace(/"/g, '""')}"`,
+      `"${(a.admin_notes || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Atharva_Solar_Consultations_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.showToast('Bookings exported to CSV successfully!', 'success');
+  };
+
+  window.openBlockDateModal = function () {
+    const modal = document.getElementById('generic-modal');
+    const content = document.getElementById('generic-modal-content');
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const minDate = tomorrow.toISOString().split('T')[0];
+
+    content.innerHTML = `
+      <div style="background:#0E1D36;padding:1.75rem;border-radius:14px;color:#FFFFFF;">
+        <h3 style="font-size:1.4rem;font-weight:800;color:#FFFFFF;margin-bottom:0.5rem;">Block Date or Time Slot</h3>
+        <p style="color:#94A3B8;font-size:0.875rem;margin-bottom:1.5rem;">Prevent customers from reserving specific dates or slots</p>
+
+        <form id="block-slot-form" onsubmit="window.handleBlockSlotSubmit(event)">
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label class="form-label" style="color:#CBD5E1;">Date to Block <span class="required">*</span></label>
+            <input type="date" id="block-date" class="form-input admin-dark-input" required min="${minDate}">
+          </div>
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label class="form-label" style="color:#CBD5E1;">Specific Time Slot (Optional)</label>
+            <select id="block-slot" class="form-select admin-dark-input">
+              <option value="">Block Entire Day</option>
+              <option value="10:00 AM - 11:00 AM">10:00 AM - 11:00 AM</option>
+              <option value="11:30 AM - 12:30 PM">11:30 AM - 12:30 PM</option>
+              <option value="02:00 PM - 03:00 PM">02:00 PM - 03:00 PM</option>
+              <option value="03:30 PM - 04:30 PM">03:30 PM - 04:30 PM</option>
+              <option value="05:00 PM - 06:00 PM">05:00 PM - 06:00 PM</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:1.5rem;">
+            <label class="form-label" style="color:#CBD5E1;">Reason</label>
+            <input type="text" id="block-reason" class="form-input admin-dark-input" placeholder="e.g. Public Holiday, Technical Audit Day">
+          </div>
+          <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.closeModal()" style="background:#1E293B;color:#CBD5E1;">Cancel</button>
+            <button type="submit" class="btn btn-amber btn-sm">Block Date</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    modal.classList.add('active');
+  };
+
+  window.handleBlockSlotSubmit = async function (e) {
+    e.preventDefault();
+    const payload = {
+      blockDate: document.getElementById('block-date').value,
+      timeSlot: document.getElementById('block-slot').value || null,
+      reason: document.getElementById('block-reason').value
+    };
+
+    try {
+      const res = await adminFetch('/api/blocked-slots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        window.closeModal();
+        window.showToast('Slot blocked successfully', 'success');
+      }
+    } catch {
+      window.showToast('Failed to block date', 'error');
+    }
+  };
+
+  // TAB 2: Customer Enquiries & Leads
   async function renderLeadsTab(container) {
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
         <div>
-          <h2 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);">Customer Enquiries & Solar Leads</h2>
-          <p style="font-size:0.875rem;color:var(--text-muted);">Real-time leads from quote requests, subsidy checks and brand inquiries</p>
+          <h2 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);">Customer Enquiries & Solar Messages</h2>
+          <p style="font-size:0.875rem;color:var(--text-muted);">Confidential messages submitted through website enquiry forms</p>
         </div>
         <div style="display:flex;gap:0.75rem;">
           <a href="/api/enquiries/export" target="_blank" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:0.4rem;">
@@ -211,14 +778,7 @@
       </div>
 
       <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
-        <input type="text" id="lead-search" class="form-input" style="max-width:300px;" placeholder="Search name, phone, city, ref..." oninput="window.filterLeads()">
-        <select id="lead-type-filter" class="form-select" style="max-width:200px;" onchange="window.filterLeads()">
-          <option value="all">All Enquiry Types</option>
-          <option value="quote">Quotation Requests</option>
-          <option value="subsidy_check">Subsidy Eligibility</option>
-          <option value="brand_inquiry">Brand Inquiries</option>
-          <option value="general_contact">General Contact</option>
-        </select>
+        <input type="text" id="lead-search" class="form-input" style="max-width:300px;" placeholder="Search name, email, city, ref..." oninput="window.filterLeads()">
         <select id="lead-status-filter" class="form-select" style="max-width:180px;" onchange="window.filterLeads()">
           <option value="all">All Statuses</option>
           <option value="new">New</option>
@@ -267,8 +827,8 @@
           <tr>
             <th>Ref No / Date</th>
             <th>Customer</th>
-            <th>Type</th>
-            <th>Details (Bill / Capacity)</th>
+            <th>Type / Topic</th>
+            <th>Message Details</th>
             <th>Status</th>
             <th>Notes</th>
             <th>Action</th>
@@ -283,17 +843,15 @@
               </td>
               <td>
                 <strong>${lead.name}</strong><br>
-                <span style="font-size:0.8rem;color:var(--text-muted);">${lead.phone}</span><br>
-                <span style="font-size:0.75rem;color:var(--solar-green);">${lead.city || 'MP'}</span>
+                <span style="font-size:0.8rem;color:#0284C7;">✉️ ${lead.email || 'No email'}</span><br>
+                <span style="font-size:0.75rem;color:var(--solar-green);">${lead.city || 'Madhya Pradesh'}</span>
               </td>
               <td>
-                <span class="badge-tag badge-blue" style="font-size:0.7rem;margin:0;">${(lead.type || '').replace('_', ' ')}</span>
-                ${lead.brand_interest ? `<br><small style="color:var(--solar-amber);font-weight:700;">${lead.brand_interest}</small>` : ''}
+                <span class="badge-tag badge-blue" style="font-size:0.7rem;margin:0;">${(lead.type || '').replace(/_/g, ' ')}</span>
+                ${lead.service_interest ? `<br><small style="color:var(--solar-amber);font-weight:700;">${lead.service_interest}</small>` : ''}
               </td>
-              <td>
-                ${lead.monthly_bill ? `Bill: <strong>₹${lead.monthly_bill}</strong><br>` : ''}
-                ${lead.solar_capacity_kw ? `Cap: <strong>${lead.solar_capacity_kw} kW</strong><br>` : ''}
-                <span style="font-size:0.75rem;color:var(--text-muted);">${lead.property_type || ''}</span>
+              <td style="max-width:250px;">
+                <span style="font-size:0.8rem;color:var(--text-main);line-height:1.4;display:block;">${lead.message || 'No message content'}</span>
               </td>
               <td>
                 <select class="form-select" style="font-size:0.8rem;padding:0.35rem 0.5rem;" onchange="window.updateLeadStatus(${lead.id}, this.value)">
@@ -308,14 +866,9 @@
                 <span style="font-size:0.8rem;color:var(--text-muted);">${lead.notes || 'None'}</span>
               </td>
               <td>
-                <div style="display:flex;gap:0.4rem;">
-                  <button class="btn btn-secondary btn-sm" onclick="window.editLeadNotes(${lead.id}, '${(lead.notes || '').replace(/'/g, "\\'")}')">
-                    Notes
-                  </button>
-                  <a href="https://wa.me/${lead.phone.replace(/\\D/g, '')}" target="_blank" class="btn btn-whatsapp btn-sm" title="Contact on WhatsApp">
-                    WA
-                  </a>
-                </div>
+                <button class="btn btn-secondary btn-sm" onclick="window.editLeadNotes(${lead.id}, '${(lead.notes || '').replace(/'/g, "\\'")}')">
+                  Notes
+                </button>
               </td>
             </tr>
           `).join('')}
@@ -326,18 +879,16 @@
 
   window.filterLeads = function () {
     const search = (document.getElementById('lead-search').value || '').toLowerCase();
-    const type = document.getElementById('lead-type-filter').value;
     const status = document.getElementById('lead-status-filter').value;
 
     const filtered = adminState.leads.filter(l => {
       const matchSearch = !search || 
         l.name.toLowerCase().includes(search) || 
-        l.phone.includes(search) || 
+        (l.email && l.email.toLowerCase().includes(search)) ||
         (l.city && l.city.toLowerCase().includes(search)) ||
         l.reference_no.toLowerCase().includes(search);
-      const matchType = type === 'all' || l.type === type;
       const matchStatus = status === 'all' || l.status === status;
-      return matchSearch && matchType && matchStatus;
+      return matchSearch && matchStatus;
     });
 
     renderLeadsTable(filtered);
@@ -351,10 +902,10 @@
         body: JSON.stringify({ status })
       });
       if (res.ok) {
-        window.showToast('Lead status updated', 'success');
+        window.showToast('Enquiry status updated', 'success');
         loadStats();
       }
-    } catch (err) {
+    } catch {
       window.showToast('Failed to update status', 'error');
     }
   };
@@ -388,376 +939,8 @@
         window.showToast('Notes saved', 'success');
         loadAndDisplayLeads();
       }
-    } catch (err) {
+    } catch {
       window.showToast('Failed to save notes', 'error');
-    }
-  };
-
-  // TAB 2: Appointments & Site Visits Command Center
-  async function renderAppointmentsTab(container) {
-    container.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
-        <div>
-          <h2 style="font-size:1.55rem;font-weight:900;color:#FFFFFF;letter-spacing:-0.02em;">📅 Site Visit & Meeting Bookings</h2>
-          <p style="font-size:0.875rem;color:#94A3B8;">Real-time rooftop inspection appointments booked by homeowners and businesses across Madhya Pradesh</p>
-        </div>
-        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-          <button class="btn btn-secondary btn-sm" onclick="window.exportAppointmentsCSV()" style="background:#0F1D33;color:#38BDF8;border-color:rgba(56,189,248,0.3);display:inline-flex;align-items:center;gap:0.4rem;">
-            ${window.Icons.download} Export CSV
-          </button>
-          <button class="btn btn-amber btn-sm" onclick="window.openBlockDateModal()">
-            ${window.Icons.calendar} Block Date / Slot
-          </button>
-          <button class="btn btn-primary btn-sm" onclick="window.loadAndDisplayAppointments()">
-            Refresh Bookings
-          </button>
-        </div>
-      </div>
-
-      <!-- Quick Status Filter Ribbon & Live Search Bar -->
-      <div class="admin-card-pane" style="margin-bottom:1.5rem;padding:1.25rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
-          
-          <!-- Filter Buttons -->
-          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="appointment-filter-chips">
-            <button class="btn btn-sm" style="background:#0284C7;color:#FFFFFF;border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('all', this)">
-              All Bookings (<span id="count-all-apts">0</span>)
-            </button>
-            <button class="btn btn-sm" style="background:#1E293B;color:#FBBF24;border:1px solid rgba(245,158,11,0.3);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('pending', this)">
-              ⏳ Pending (<span id="count-pending-apts">0</span>)
-            </button>
-            <button class="btn btn-sm" style="background:#1E293B;color:#34D399;border:1px solid rgba(52,211,153,0.3);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('confirmed', this)">
-              ✅ Confirmed (<span id="count-confirmed-apts">0</span>)
-            </button>
-            <button class="btn btn-sm" style="background:#1E293B;color:#38BDF8;border:1px solid rgba(56,189,248,0.3);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('today', this)">
-              📅 Today's Visits (<span id="count-today-apts">0</span>)
-            </button>
-            <button class="btn btn-sm" style="background:#1E293B;color:#CBD5E1;border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('completed', this)">
-              🏁 Completed (<span id="count-completed-apts">0</span>)
-            </button>
-          </div>
-
-          <!-- Instant Live Search -->
-          <div style="min-width:260px;flex:1;max-width:380px;">
-            <input type="text" id="appointment-search-input" class="form-input admin-dark-input" placeholder="🔍 Search customer, phone, city..." oninput="window.filterAppointmentsLive()" style="padding:0.55rem 0.85rem;font-size:0.85rem;">
-          </div>
-        </div>
-      </div>
-
-      <div id="appointments-table-wrap" class="admin-table-container">
-        <div style="padding:2.5rem;text-align:center;color:#94A3B8;">Loading appointments...</div>
-      </div>
-    `;
-
-    await loadAndDisplayAppointments();
-  }
-
-  adminState.appointmentFilter = 'all';
-
-  window.setAppointmentFilter = function (filter, btnEl) {
-    adminState.appointmentFilter = filter;
-    document.querySelectorAll('#appointment-filter-chips button').forEach(b => {
-      b.style.background = '#1E293B';
-    });
-    if (btnEl) btnEl.style.background = '#0284C7';
-    window.filterAppointmentsLive();
-  };
-
-  window.filterAppointmentsLive = function () {
-    const search = (document.getElementById('appointment-search-input')?.value || '').toLowerCase().trim();
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    const filtered = (adminState.appointments || []).filter(a => {
-      const matchSearch = !search ||
-        (a.full_name || '').toLowerCase().includes(search) ||
-        (a.phone || '').includes(search) ||
-        (a.city || '').toLowerCase().includes(search) ||
-        (a.reference_no || '').toLowerCase().includes(search);
-
-      let matchFilter = true;
-      if (adminState.appointmentFilter === 'pending') matchFilter = a.status === 'pending';
-      else if (adminState.appointmentFilter === 'confirmed') matchFilter = a.status === 'confirmed';
-      else if (adminState.appointmentFilter === 'completed') matchFilter = a.status === 'completed';
-      else if (adminState.appointmentFilter === 'today') matchFilter = a.appointment_date === todayStr;
-
-      return matchSearch && matchFilter;
-    });
-
-    renderAppointmentsTable(filtered);
-  };
-
-  async function loadAndDisplayAppointments() {
-    try {
-      const res = await adminFetch('/api/appointments');
-      const data = await res.json();
-      if (data.success && data.appointments) {
-        adminState.appointments = data.appointments;
-
-        // Update counts
-        const todayStr = new Date().toISOString().split('T')[0];
-        const elAll = document.getElementById('count-all-apts');
-        if (elAll) elAll.textContent = data.appointments.length;
-        const elPending = document.getElementById('count-pending-apts');
-        if (elPending) elPending.textContent = data.appointments.filter(a => a.status === 'pending').length;
-        const elConfirmed = document.getElementById('count-confirmed-apts');
-        if (elConfirmed) elConfirmed.textContent = data.appointments.filter(a => a.status === 'confirmed').length;
-        const elToday = document.getElementById('count-today-apts');
-        if (elToday) elToday.textContent = data.appointments.filter(a => a.appointment_date === todayStr).length;
-        const elCompleted = document.getElementById('count-completed-apts');
-        if (elCompleted) elCompleted.textContent = data.appointments.filter(a => a.status === 'completed').length;
-
-        renderAppointmentsTable(data.appointments);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  window.loadAndDisplayAppointments = loadAndDisplayAppointments;
-
-  function renderAppointmentsTable(apts) {
-    const wrap = document.getElementById('appointments-table-wrap');
-    if (!wrap) return;
-
-    if (apts.length === 0) {
-      wrap.innerHTML = '<div style="padding:3rem;text-align:center;color:#94A3B8;">No meeting appointments match your filter.</div>';
-      return;
-    }
-
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    wrap.innerHTML = `
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>Booking Ref / Date</th>
-            <th>Time Slot</th>
-            <th>Customer & City</th>
-            <th>Consultation Type</th>
-            <th>Monthly Bill & Roof Notes</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${apts.map(a => {
-            const isToday = a.appointment_date === todayStr;
-            const waPhone = a.phone.replace(/\\D/g, '');
-            const waText = encodeURIComponent(
-              `Hello ${a.full_name}, this is Atharva Enterprises regarding your scheduled solar site inspection (${a.reference_no}) booked for ${a.appointment_date} (${a.time_slot}) in ${a.city}. Our survey team will coordinate with you. Please let us know if you need any adjustments.`
-            );
-
-            return `
-              <tr>
-                <td>
-                  <strong style="color:#FFFFFF;font-size:0.9rem;">${a.reference_no}</strong><br>
-                  <span style="font-weight:700;color:${isToday ? '#38BDF8' : '#CBD5E1'};font-size:0.85rem;">
-                    📅 ${a.appointment_date}
-                  </span>
-                  ${isToday ? '<span class="badge" style="background:#EF4444;color:#FFFFFF;font-size:0.65rem;margin-left:4px;padding:0.15rem 0.4rem;">TODAY</span>' : ''}
-                </td>
-                <td>
-                  <span class="badge" style="background:rgba(56,189,248,0.15);color:#38BDF8;border:1px solid rgba(56,189,248,0.3);font-size:0.75rem;white-space:nowrap;">
-                    ⏰ ${a.time_slot}
-                  </span>
-                </td>
-                <td>
-                  <strong style="color:#FFFFFF;font-size:0.95rem;">${a.full_name}</strong><br>
-                  <span style="font-size:0.825rem;color:#94A3B8;font-family:monospace;">📞 ${a.phone}</span><br>
-                  <span style="font-size:0.75rem;color:#34D399;font-weight:700;">📍 ${a.city} (${(a.property_type || '').toUpperCase()})</span>
-                </td>
-                <td>
-                  <span class="badge" style="background:rgba(255,255,255,0.08);color:#F1F5F9;font-size:0.725rem;font-weight:700;text-transform:uppercase;">
-                    ${(a.meeting_type || 'site_visit').replace('_', ' ')}
-                  </span>
-                </td>
-                <td style="max-width:220px;">
-                  ${a.bill_range ? `<span style="font-size:0.75rem;color:#FBBF24;font-weight:700;">⚡ Bill: ${a.bill_range}</span><br>` : ''}
-                  <span style="font-size:0.78rem;color:#94A3B8;line-height:1.35;display:block;">
-                    ${a.requirements ? a.requirements.slice(0, 65) + (a.requirements.length > 65 ? '...' : '') : 'No special notes'}
-                  </span>
-                  ${a.admin_notes ? `<span style="font-size:0.72rem;color:#34D399;display:block;margin-top:2px;">📝 Note: ${a.admin_notes}</span>` : ''}
-                </td>
-                <td>
-                  <select class="form-select admin-dark-input" style="font-size:0.8rem;padding:0.4rem 0.65rem;font-weight:700;border-radius:8px;color:${
-                    a.status === 'confirmed' ? '#34D399' : a.status === 'pending' ? '#FBBF24' : a.status === 'completed' ? '#38BDF8' : '#EF4444'
-                  };" onchange="window.updateAppointmentStatus(${a.id}, this.value)">
-                    <option value="pending" ${a.status === 'pending' ? 'selected' : ''}>⏳ Pending</option>
-                    <option value="confirmed" ${a.status === 'confirmed' ? 'selected' : ''}>✅ Confirmed</option>
-                    <option value="completed" ${a.status === 'completed' ? 'selected' : ''}>🏁 Completed</option>
-                    <option value="cancelled" ${a.status === 'cancelled' ? 'selected' : ''}>❌ Cancelled</option>
-                    <option value="rejected" ${a.status === 'rejected' ? 'selected' : ''}>🚫 Rejected</option>
-                  </select>
-                </td>
-                <td>
-                  <div style="display:flex;gap:0.45rem;align-items:center;">
-                    <a href="https://wa.me/${waPhone}?text=${waText}" target="_blank" class="btn btn-sm" style="background:#25D366;color:#FFFFFF;padding:0.4rem 0.65rem;border-radius:7px;font-size:0.75rem;display:inline-flex;align-items:center;gap:0.25rem;" title="Chat with customer on WhatsApp">
-                      💬 WA
-                    </a>
-                    <a href="tel:${a.phone.replace(/\\s/g, '')}" class="btn btn-sm" style="background:#0F1D33;color:#F1F5F9;border:1px solid rgba(255,255,255,0.2);padding:0.4rem 0.65rem;border-radius:7px;" title="Direct Call">
-                      ${window.Icons.phone}
-                    </a>
-                    <button class="btn btn-sm" style="background:#1E293B;color:#CBD5E1;border:1px solid rgba(255,255,255,0.12);padding:0.4rem 0.55rem;border-radius:7px;font-size:0.75rem;" onclick="window.editAppointmentNotes(${a.id}, '${(a.admin_notes || '').replace(/'/g, "\\'")}')" title="Technician / Survey Notes">
-                      📝 Notes
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
-    `;
-  }
-
-  window.editAppointmentNotes = function (id, currentNotes) {
-    const modal = document.getElementById('generic-modal');
-    const content = document.getElementById('generic-modal-content');
-
-    content.innerHTML = `
-      <div style="background:#0E1D36;padding:1.5rem;border-radius:14px;color:#FFFFFF;">
-        <h3 style="font-size:1.35rem;font-weight:800;color:#FFFFFF;margin-bottom:0.5rem;">Survey Engineer & Inspection Notes</h3>
-        <p style="color:#94A3B8;font-size:0.825rem;margin-bottom:1.25rem;">Record rooftop inspection details, shadow analysis notes, or quotation status</p>
-        <textarea id="apt-note-text" class="form-textarea admin-dark-input" rows="4" style="margin-bottom:1.25rem;width:100%;">${currentNotes || ''}</textarea>
-        <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-          <button class="btn btn-secondary btn-sm" style="background:#1E293B;color:#CBD5E1;" onclick="window.closeModal()">Cancel</button>
-          <button class="btn btn-primary btn-sm" onclick="window.saveAppointmentNote(${id})">Save Survey Notes</button>
-        </div>
-      </div>
-    `;
-
-    modal.classList.add('active');
-  };
-
-  window.saveAppointmentNote = async function (id) {
-    const adminNotes = document.getElementById('apt-note-text').value;
-    try {
-      const res = await adminFetch(`/api/appointments/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminNotes })
-      });
-      if (res.ok) {
-        window.closeModal();
-        window.showToast('Survey notes saved successfully', 'success');
-        loadAndDisplayAppointments();
-      }
-    } catch (err) {
-      window.showToast('Failed to save notes', 'error');
-    }
-  };
-
-  window.exportAppointmentsCSV = function () {
-    const apts = adminState.appointments || [];
-    if (apts.length === 0) {
-      window.showToast('No appointments to export', 'info');
-      return;
-    }
-    const headers = ['Ref No', 'Date', 'Time Slot', 'Customer Name', 'Phone', 'City', 'Property Type', 'Meeting Type', 'Bill Range', 'Status', 'Requirements', 'Admin Notes'];
-    const rows = apts.map(a => [
-      `"${a.reference_no}"`,
-      `"${a.appointment_date}"`,
-      `"${a.time_slot}"`,
-      `"${a.full_name}"`,
-      `"${a.phone}"`,
-      `"${a.city}"`,
-      `"${a.property_type}"`,
-      `"${a.meeting_type}"`,
-      `"${a.bill_range || ''}"`,
-      `"${a.status}"`,
-      `"${(a.requirements || '').replace(/"/g, '""')}"`,
-      `"${(a.admin_notes || '').replace(/"/g, '""')}"`
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Atharva_Solar_Bookings_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.showToast('Bookings exported to CSV successfully!', 'success');
-  };
-
-  window.updateAppointmentStatus = async function (id, status) {
-    try {
-      const res = await adminFetch(`/api/appointments/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      if (res.ok) {
-        window.showToast('Appointment status updated', 'success');
-        loadStats();
-      }
-    } catch (err) {
-      window.showToast('Failed to update appointment', 'error');
-    }
-  };
-
-  window.openBlockDateModal = function () {
-    const modal = document.getElementById('generic-modal');
-    const content = document.getElementById('generic-modal-content');
-
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const minDate = tomorrow.toISOString().split('T')[0];
-
-    content.innerHTML = `
-      <h3 style="font-size:1.4rem;font-weight:800;color:var(--navy-900);margin-bottom:0.5rem;">Block Date or Time Slot</h3>
-      <p style="color:var(--text-muted);font-size:0.875rem;margin-bottom:1.5rem;">Prevent customers from selecting specific dates for site visits</p>
-
-      <form id="block-slot-form" onsubmit="window.handleBlockSlotSubmit(event)">
-        <div class="form-group" style="margin-bottom:1rem;">
-          <label class="form-label">Date to Block <span class="required">*</span></label>
-          <input type="date" id="block-date" class="form-input" required min="${minDate}">
-        </div>
-        <div class="form-group" style="margin-bottom:1rem;">
-          <label class="form-label">Specific Time Slot (Optional)</label>
-          <select id="block-slot" class="form-select">
-            <option value="">Block Entire Day</option>
-            <option value="10:00 AM - 11:30 AM">10:00 AM - 11:30 AM</option>
-            <option value="11:30 AM - 01:00 PM">11:30 AM - 01:00 PM</option>
-            <option value="02:00 PM - 03:30 PM">02:00 PM - 03:30 PM</option>
-            <option value="03:30 PM - 05:00 PM">03:30 PM - 05:00 PM</option>
-            <option value="05:00 PM - 06:30 PM">05:00 PM - 06:30 PM</option>
-          </select>
-        </div>
-        <div class="form-group" style="margin-bottom:1.5rem;">
-          <label class="form-label">Reason</label>
-          <input type="text" id="block-reason" class="form-input" placeholder="e.g. Public Holiday, Team Survey Day">
-        </div>
-        <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-          <button type="button" class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-amber">Block Date</button>
-        </div>
-      </form>
-    `;
-
-    modal.classList.add('active');
-  };
-
-  window.handleBlockSlotSubmit = async function (e) {
-    e.preventDefault();
-    const payload = {
-      blockDate: document.getElementById('block-date').value,
-      timeSlot: document.getElementById('block-slot').value || null,
-      reason: document.getElementById('block-reason').value
-    };
-
-    try {
-      const res = await adminFetch('/api/blocked-slots', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        window.closeModal();
-        window.showToast('Slot blocked successfully', 'success');
-      }
-    } catch (err) {
-      window.showToast('Failed to block date', 'error');
     }
   };
 
@@ -771,7 +954,7 @@
       container.innerHTML = `
         <div style="margin-bottom:1.5rem;">
           <h2 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);">Available Solar Brands Management</h2>
-          <p style="font-size:0.875rem;color:var(--text-muted);">Toggle brand product availability and highlight key offerings</p>
+          <p style="font-size:0.875rem;color:var(--text-muted);">Toggle brand product availability and highlight offerings</p>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:1.25rem;">
@@ -790,7 +973,7 @@
           `).join('')}
         </div>
       `;
-    } catch (err) {
+    } catch {
       container.innerHTML = '<div style="color:#EF4444;">Error loading brands.</div>';
     }
   }
@@ -805,105 +988,15 @@
       if (res.ok) {
         window.showToast('Brand status updated', 'success');
       }
-    } catch (err) {
+    } catch {
       window.showToast('Failed to update brand status', 'error');
     }
   };
 
-  // TAB 4: Website CMS & Settings
-  async function renderSettingsTab(container) {
-    try {
-      const res = await fetch('/api/settings');
-      const data = await res.json();
-      const s = data.settings || {};
-
-      container.innerHTML = `
-        <div style="margin-bottom:1.5rem;">
-          <h2 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);">Website Settings & Business Content CMS</h2>
-          <p style="font-size:0.875rem;color:var(--text-muted);">Update helpline contacts, subsidy deadline and PWD registration notes without touching code</p>
-        </div>
-
-        <form id="settings-cms-form" onsubmit="window.saveSettingsCMS(event)" style="background:#FFF;border:1px solid var(--border-color);border-radius:var(--radius-xl);padding:2rem;max-width:800px;">
-          <div class="form-group" style="margin-bottom:1.25rem;">
-            <label class="form-label">Company Name</label>
-            <input type="text" id="set-company-name" class="form-input" value="${s.company_name || 'Atharva Enterprises'}">
-          </div>
-          <div class="form-group" style="margin-bottom:1.25rem;">
-            <label class="form-label">Tagline</label>
-            <input type="text" id="set-tagline" class="form-input" value="${s.tagline || 'Powering Your Future with Clean Solar Energy.'}">
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem;">
-            <div class="form-group">
-              <label class="form-label">Contact Phone</label>
-              <input type="text" id="set-phone" class="form-input" value="${s.phone || '+91 90390 05531'}">
-            </div>
-            <div class="form-group">
-              <label class="form-label">WhatsApp Number</label>
-              <input type="text" id="set-whatsapp" class="form-input" value="${s.whatsapp || '+91 90390 05531'}">
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem;">
-            <div class="form-group">
-              <label class="form-label">Subsidy Offer Deadline</label>
-              <input type="date" id="set-deadline" class="form-input" value="${s.subsidy_deadline || '2027-03-31'}">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Max Subsidy Amount (₹)</label>
-              <input type="number" id="set-subsidy-max" class="form-input" value="${s.subsidy_max_amount || '78000'}">
-            </div>
-          </div>
-          <div class="form-group" style="margin-bottom:1.25rem;">
-            <label class="form-label">Office Address / Coverage Area</label>
-            <textarea id="set-address" class="form-textarea" rows="2">${s.office_address || 'Serving Bhopal, Indore, Jabalpur, Gwalior, Ujjain & throughout Madhya Pradesh'}</textarea>
-          </div>
-          <div class="form-group" style="margin-bottom:1.5rem;">
-            <label class="form-label">A Class Electrical & PWD Contractor Note</label>
-            <textarea id="set-pwd" class="form-textarea" rows="2">${s.pwd_license_info || 'Registered A Class Electrical & PWD Contractor with Government of Madhya Pradesh.'}</textarea>
-          </div>
-          <button type="submit" class="btn btn-primary">
-            Save All Settings
-          </button>
-        </form>
-      `;
-    } catch (err) {
-      container.innerHTML = '<div style="color:#EF4444;">Error loading settings.</div>';
-    }
-  }
-
-  window.saveSettingsCMS = async function (e) {
-    e.preventDefault();
-    const payload = {
-      company_name: document.getElementById('set-company-name').value,
-      tagline: document.getElementById('set-tagline').value,
-      phone: document.getElementById('set-phone').value,
-      whatsapp: document.getElementById('set-whatsapp').value,
-      subsidy_deadline: document.getElementById('set-deadline').value,
-      subsidy_max_amount: document.getElementById('set-subsidy-max').value,
-      office_address: document.getElementById('set-address').value,
-      pwd_license_info: document.getElementById('set-pwd').value
-    };
-
-    try {
-      const res = await adminFetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        window.showToast('Settings saved successfully', 'success');
-      }
-    } catch (err) {
-      window.showToast('Failed to save settings', 'error');
-    }
-  };
-
-  // TAB 0: Website Traffic & Live Visitor Analytics
+  // TAB 4: Website Traffic & Live Visitor Analytics
   async function renderAnalyticsTab(container) {
     container.innerHTML = `
       <div style="text-align:center;padding:3rem 1rem;color:var(--text-muted);">
-        <div style="display:inline-block;margin-bottom:0.75rem;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
-        </div>
         <div>Loading visitor traffic & analytics...</div>
       </div>
     `;
@@ -913,7 +1006,6 @@
       const data = await res.json();
       const a = data.analytics || {};
 
-      // Device calculations
       const devices = a.devices || [];
       let totalDev = 0;
       let mobileCount = 0;
@@ -934,39 +1026,32 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
           <div>
             <h2 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);">Website Traffic & Visitor Analytics</h2>
-            <p style="font-size:0.875rem;color:var(--text-muted);">Live tracking of visitors, pageviews, and visitor device usage (Admin Only)</p>
+            <p style="font-size:0.875rem;color:var(--text-muted);">Real-time metrics on visitor volume and devices (Admin Protected)</p>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="window.refreshAnalyticsTab()" style="display:inline-flex;align-items:center;gap:0.4rem;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+          <button class="btn btn-secondary btn-sm" onclick="window.refreshAnalyticsTab()">
             Refresh Live Traffic
           </button>
         </div>
 
-        <!-- 4 Detailed Visitor Metrics -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:1rem;margin-bottom:1.75rem;">
           <div style="background:#FFFFFF;padding:1.25rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);">
             <div style="font-size:0.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.35rem;">Total Page Views (Hits)</div>
             <div style="font-size:2rem;font-weight:900;color:var(--navy-900);">${a.totalViews || 0}</div>
-            <div style="font-size:0.75rem;color:#0284C7;margin-top:0.25rem;">Total times site was opened</div>
           </div>
           <div style="background:#FFFFFF;padding:1.25rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);">
             <div style="font-size:0.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.35rem;">Total Unique Visitors</div>
             <div style="font-size:2rem;font-weight:900;color:#0284C7;">${a.uniqueVisitors || 0}</div>
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Distinct potential clients</div>
           </div>
           <div style="background:#FFFFFF;padding:1.25rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);">
             <div style="font-size:0.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.35rem;">Today's Page Views</div>
             <div style="font-size:2rem;font-weight:900;color:var(--solar-green);">${a.todayViews || 0}</div>
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Hits today</div>
           </div>
           <div style="background:#FFFFFF;padding:1.25rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);">
             <div style="font-size:0.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.35rem;">Today's Unique Visitors</div>
             <div style="font-size:2rem;font-weight:900;color:var(--solar-amber);">${a.todayUnique || 0}</div>
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">New active visitors today</div>
           </div>
         </div>
 
-        <!-- Device Breakdown Card -->
         <div style="background:#FFFFFF;padding:1.5rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);margin-bottom:1.75rem;">
           <h3 style="font-size:1.1rem;font-weight:800;color:var(--navy-900);margin-bottom:1rem;">Visitor Device Breakdown</h3>
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:1.25rem;">
@@ -999,57 +1084,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Recent Visitor Log Table -->
-        <div style="background:#FFFFFF;padding:1.5rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
-            <h3 style="font-size:1.1rem;font-weight:800;color:var(--navy-900);">Recent Live Visitors Log</h3>
-            <span style="font-size:0.8rem;color:var(--text-muted);">Latest 25 recorded visits</span>
-          </div>
-          
-          <div style="overflow-x:auto;">
-            <table class="admin-table" style="width:100%;">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Device</th>
-                  <th>Page Visited</th>
-                  <th>Referrer Source</th>
-                  <th>Visitor ID</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${(a.recentVisits && a.recentVisits.length > 0) ? a.recentVisits.map(v => `
-                  <tr>
-                    <td style="white-space:nowrap;font-size:0.85rem;color:var(--navy-900);font-weight:600;">
-                      ${new Date(v.visited_at).toLocaleString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
-                    </td>
-                    <td>
-                      <span class="badge ${v.device_type === 'Mobile' ? 'badge-green' : v.device_type === 'Tablet' ? 'badge-amber' : 'badge-blue'}">
-                        ${v.device_type === 'Mobile' ? '📱 Mobile' : v.device_type === 'Tablet' ? '📟 Tablet' : '💻 Desktop'}
-                      </span>
-                    </td>
-                    <td style="font-size:0.85rem;color:#0284C7;font-family:monospace;">
-                      ${v.page_path || '/'}
-                    </td>
-                    <td style="font-size:0.85rem;color:var(--text-muted);">
-                      ${v.referrer || 'Direct'}
-                    </td>
-                    <td style="font-size:0.75rem;font-family:monospace;color:#94A3B8;">
-                      ${(v.visitor_id || '').substring(0, 10)}...
-                    </td>
-                  </tr>
-                `).join('') : `
-                  <tr>
-                    <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
-                      No visitor traffic recorded yet. Once users visit the website, their data will appear live here!
-                    </td>
-                  </tr>
-                `}
-              </tbody>
-            </table>
-          </div>
-        </div>
       `;
     } catch (err) {
       container.innerHTML = `<div style="color:#EF4444;padding:2rem;">Error loading visitor analytics: ${err.message}</div>`;
@@ -1062,13 +1096,13 @@
     loadStats();
   };
 
-  // TAB 4: Admin Password & Security
+  // TAB 5: Admin Password & Security Controls
   function renderSecurityTab(container) {
     container.innerHTML = `
       <div style="max-width:550px;">
         <div style="margin-bottom:1.5rem;">
-          <h2 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);">Admin Password & Security</h2>
-          <p style="font-size:0.875rem;color:var(--text-muted);">Set your own secret password so no unauthorized person can access the portal</p>
+          <h2 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);">Admin Password & Security Settings</h2>
+          <p style="font-size:0.875rem;color:var(--text-muted);">Encrypted with PBKDF2 (SHA-512, 100,000 iterations and random salt)</p>
         </div>
 
         <div style="background:#FFFFFF;padding:1.75rem;border-radius:12px;border:1px solid var(--border-color);box-shadow:var(--shadow-sm);">
@@ -1079,16 +1113,16 @@
             </div>
 
             <div class="form-group" style="margin-bottom:1.25rem;">
-              <label class="form-label">New Secret Password (min 6 characters)</label>
-              <input type="password" id="cp-new" class="form-input" required minlength="6" placeholder="Enter new secret password">
+              <label class="form-label">New Secret Password (min 8 characters)</label>
+              <input type="password" id="cp-new" class="form-input" required minlength="8" placeholder="Enter new secret password">
             </div>
 
             <div class="form-group" style="margin-bottom:1.5rem;">
               <label class="form-label">Confirm New Password</label>
-              <input type="password" id="cp-confirm" class="form-input" required minlength="6" placeholder="Re-type new secret password">
+              <input type="password" id="cp-confirm" class="form-input" required minlength="8" placeholder="Re-type new secret password">
             </div>
 
-            <button type="submit" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:0.5rem;">
+            <button type="submit" class="btn btn-primary">
               Update Password
             </button>
           </form>
@@ -1116,7 +1150,7 @@
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        window.showToast('Admin password updated successfully! Please remember your new password.', 'success');
+        window.showToast('Admin password updated successfully with PBKDF2 encryption!', 'success');
         document.getElementById('change-password-form').reset();
       } else {
         window.showToast(data.error || 'Failed to update password', 'error');
@@ -1126,7 +1160,7 @@
     }
   };
 
-  // Route listener: Check if path or hash is admin portal
+  // Route listener
   function handleRoute() {
     const isSecretRoute = 
       window.location.hash === '#admin-portal' || 
@@ -1145,7 +1179,7 @@
   window.addEventListener('hashchange', handleRoute);
   document.addEventListener('DOMContentLoaded', handleRoute);
 
-  // Discreet secret shortcut: Ctrl+Shift+A opens the portal
+  // Discreet shortcut: Ctrl+Shift+A opens the portal
   window.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
       e.preventDefault();

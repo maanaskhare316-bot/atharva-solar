@@ -1,5 +1,5 @@
 /**
- * Atharva Enterprises - Database Module
+ * Atharva Enterprises - Secure Database Module
  * Uses native Node.js SQLite (node:sqlite DatabaseSync)
  * Persistent, zero external npm dependencies required.
  */
@@ -7,6 +7,7 @@
 const { DatabaseSync } = require('node:sqlite');
 const path = require('node:path');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 
 // Ensure data directory exists
 const dataDir = path.join(__dirname, '..', 'data');
@@ -22,6 +23,15 @@ db.exec(`
   PRAGMA journal_mode = WAL;
   PRAGMA foreign_keys = ON;
 `);
+
+/**
+ * Native PBKDF2 helper for seeding default admin
+ */
+function hashPbkdf2Sync(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derivedKey = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+  return `pbkdf2:${salt}:${derivedKey}`;
+}
 
 /**
  * Initialize Database Schema
@@ -71,53 +81,55 @@ function initSchema() {
       active INTEGER DEFAULT 1
     );
 
-    -- Customer Leads & Enquiries
+    -- Customer Leads & General Enquiries (Confidential)
     CREATE TABLE IF NOT EXISTS enquiries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       reference_no TEXT UNIQUE NOT NULL,
-      type TEXT NOT NULL, -- 'quote', 'callback', 'subsidy_check', 'brand_inquiry', 'general_contact'
+      type TEXT NOT NULL,
       name TEXT NOT NULL,
-      phone TEXT NOT NULL,
+      phone TEXT,
       email TEXT,
       city TEXT,
       state TEXT DEFAULT 'Madhya Pradesh',
-      property_type TEXT, -- 'residential', 'commercial', 'industrial'
+      property_type TEXT,
       monthly_bill REAL,
       solar_capacity_kw REAL,
       brand_interest TEXT,
       service_interest TEXT,
       message TEXT,
-      status TEXT DEFAULT 'new', -- 'new', 'in_review', 'contacted', 'converted', 'closed'
+      status TEXT DEFAULT 'new',
       notes TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Scheduled Meetings and Site Visits
+    -- Scheduled Online Meetings (Confidential)
     CREATE TABLE IF NOT EXISTS appointments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       reference_no TEXT UNIQUE NOT NULL,
       full_name TEXT NOT NULL,
-      phone TEXT NOT NULL,
-      email TEXT,
-      city TEXT NOT NULL,
-      property_type TEXT NOT NULL, -- 'residential', 'commercial', 'industrial'
-      meeting_type TEXT NOT NULL, -- 'online_consultation', 'office_meeting', 'site_visit'
-      appointment_date TEXT NOT NULL, -- YYYY-MM-DD
-      time_slot TEXT NOT NULL, -- '10:00 AM - 11:30 AM', etc.
+      phone TEXT,
+      email TEXT NOT NULL,
+      city TEXT,
+      property_type TEXT NOT NULL,
+      meeting_type TEXT NOT NULL,
+      appointment_date TEXT NOT NULL,
+      time_slot TEXT NOT NULL,
       bill_range TEXT,
       requirements TEXT,
-      status TEXT DEFAULT 'pending', -- 'pending', 'confirmed', 'completed', 'cancelled', 'rejected'
+      status TEXT DEFAULT 'pending',
       admin_notes TEXT,
+      meeting_link TEXT,
+      meeting_link_sent_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Blocked / Custom Dates and Slots
+    -- Blocked Dates and Slots (Admin Managed)
     CREATE TABLE IF NOT EXISTS blocked_slots (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      block_date TEXT NOT NULL, -- YYYY-MM-DD
-      time_slot TEXT, -- NULL means entire day blocked
+      block_date TEXT NOT NULL,
+      time_slot TEXT,
       reason TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -133,42 +145,66 @@ function initSchema() {
       referrer TEXT,
       visited_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- Login Attempt Logs (Security Audit)
+    CREATE TABLE IF NOT EXISTS login_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ip_address TEXT NOT NULL,
+      email TEXT,
+      success INTEGER NOT NULL,
+      attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
+  // Safely ensure migration columns exist on existing databases
+  safeAddColumn('appointments', 'meeting_link', 'TEXT');
+  safeAddColumn('appointments', 'meeting_link_sent_at', 'DATETIME');
+
   seedDefaultData();
+}
+
+/**
+ * Helper to safely add column if not exists
+ */
+function safeAddColumn(table, column, typeDef) {
+  try {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${typeDef};`);
+  } catch {
+    // Column already exists or table not ready, safely ignore
+  }
 }
 
 /**
  * Seed Initial Data
  */
 function seedDefaultData() {
-  // 1. Seed Admin User (default: admin@atharvasolar.com / Atharva@2026)
-  const existingAdmin = db.prepare('SELECT id FROM admin_users WHERE email = ?').get('admin@atharvasolar.com');
+  // 1. Seed Admin User (default: admin@atharvasolar.com / Atharva@2026 with PBKDF2)
+  const existingAdmin = db.prepare('SELECT id, password_hash FROM admin_users WHERE email = ?').get('admin@atharvasolar.com');
   if (!existingAdmin) {
-    // SHA256 of 'Atharva@2026'
-    const crypto = require('node:crypto');
-    const hash = crypto.createHash('sha256').update('Atharva@2026').digest('hex');
+    const pbkdf2Hash = hashPbkdf2Sync('Atharva@2026');
     db.prepare(`
       INSERT INTO admin_users (email, password_hash, name, role)
       VALUES (?, ?, ?, ?)
-    `).run('admin@atharvasolar.com', hash, 'Atharva Administrator', 'superadmin');
+    `).run('admin@atharvasolar.com', pbkdf2Hash, 'Atharva Administrator', 'superadmin');
+  } else if (!existingAdmin.password_hash.startsWith('pbkdf2:')) {
+    // Upgrade existing admin hash to PBKDF2
+    const upgradedHash = hashPbkdf2Sync('Atharva@2026');
+    db.prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?').run(upgradedHash, existingAdmin.id);
   }
 
-  // 2. Seed Default Settings
+  // 2. Seed Default Settings - Without public phone numbers
   const defaultSettings = [
     ['company_name', 'Atharva Enterprises'],
     ['tagline', 'Powering Your Future with Clean Solar Energy.'],
     ['business_description', 'A Class Electrical & PWD Contractor.'],
-    ['phone', '+91 90390 05531'],
-    ['whatsapp', '+91 90390 05531'],
-    ['whatsapp_digits', '919039005531'],
-    ['email', 'contact@atharvaenterprises.in'],
     ['market', 'Madhya Pradesh & Central India'],
-    ['office_address', 'Serving Bhopal, Indore, Jabalpur, Gwalior, Ujjain & throughout Madhya Pradesh'],
+    ['office_address', 'Regional Operations across Bhopal, Indore, Jabalpur, Gwalior & Ujjain, Madhya Pradesh'],
     ['pwd_license_info', 'Registered A Class Electrical & PWD Contractor with Government of Madhya Pradesh.'],
     ['subsidy_deadline', '2027-03-31'],
     ['subsidy_max_amount', '78000'],
-    ['subsidy_disclaimer', 'Subsidy is subject to government scheme guidelines, eligibility, approved system capacity, installation requirements and successful application approval. The amount of up to ₹78,000 is not guaranteed for every customer. Verify current scheme rules before applying.']
+    ['subsidy_disclaimer', 'Subsidy is subject to government scheme guidelines, eligibility, approved system capacity, installation requirements and successful application approval. The amount of up to ₹78,000 is not guaranteed for every customer. Verify current scheme rules before applying.'],
+    ['meeting_platform', 'Google Meet'],
+    ['booking_advance_days', '30']
   ];
 
   const insertSetting = db.prepare(`
@@ -178,71 +214,74 @@ function seedDefaultData() {
     insertSetting.run(key, value);
   }
 
+  // Clean up any legacy public phone numbers from settings
+  db.prepare("DELETE FROM settings WHERE key IN ('phone', 'whatsapp', 'whatsapp_digits')").run();
+
   // 3. Seed Available Solar Brands
   const defaultBrands = [
     {
       name: 'Adani Solar',
-      tagline: 'India’s Leading High-Efficiency Tier-1 PV Manufacturer',
-      description: 'Adani Solar specializes in high-efficiency mono PERC and bifacial PV modules engineered for extreme Indian weather and prolonged durability.',
+      tagline: 'High-Efficiency Tier-1 PV Manufacturer',
+      description: 'Mono PERC and bifacial PV modules engineered for durability in Central Indian climates.',
       category: 'Top Tier PV',
       order: 1,
-      features: JSON.stringify(['Mono PERC & TOPCon Tech', 'Up to 25-Year Performance Warranty', 'High Heat Tolerance'])
+      features: JSON.stringify(['Mono PERC & TOPCon Tech', '25-Year Performance Warranty', 'High Heat Tolerance'])
     },
     {
       name: 'Tata Power Solar',
-      tagline: 'Pioneer of Indian Rooftop & Utility Solar Engineering',
-      description: 'Tata Power Solar brings over three decades of engineering excellence, robust grid safety compatibility, and trusted PAN-India reliability.',
+      tagline: 'Pioneer of Indian Rooftop Engineering',
+      description: 'Over three decades of engineering excellence, robust grid safety compatibility, and trusted PAN-India reliability.',
       category: 'Premium Legacy',
       order: 2,
       features: JSON.stringify(['30+ Years Industry Legacy', 'Strict Quality Standards', 'High Energy Yield'])
     },
     {
       name: 'Waaree',
-      tagline: 'India’s Largest Solar Module Manufacturer',
-      description: 'Waaree provides cutting-edge DCR & Non-DCR solar panels compliant with central subsidy specifications and high temperature coefficients.',
+      tagline: 'Largest Solar Module Manufacturer in India',
+      description: 'DCR & Non-DCR solar panels compliant with central subsidy specifications.',
       category: 'Market Leader',
       order: 3,
-      features: JSON.stringify(['12 GW Global Capacity', 'MNRE ALMM Approved', 'Bifacial & Half-Cut Modules'])
+      features: JSON.stringify(['Global Capacity & Standards', 'MNRE ALMM Approved', 'Bifacial & Half-Cut Modules'])
     },
     {
       name: 'Avaada Solar',
       tagline: 'Clean Energy & Green Technology Innovator',
-      description: 'Avaada provides robust industrial-grade solar panels and renewable integration for heavy duty commercial and residential requirements.',
+      description: 'Industrial-grade solar panels and renewable integration for heavy duty commercial applications.',
       category: 'Industrial & Utility',
       order: 4,
       features: JSON.stringify(['Heavy-duty Frame Design', 'Optimal Low-light Performance', 'Severe Weather Resistance'])
     },
     {
       name: 'RenewSys',
-      tagline: 'First Integrated Solar Manufacturer in India',
-      description: 'RenewSys manufactures comprehensive solar PV components including encapsulants, backsheets, and PV cells for peak field longevity.',
+      tagline: 'Integrated Solar PV Manufacturer',
+      description: 'Comprehensive solar PV components including encapsulants, backsheets, and PV cells for peak field longevity.',
       category: 'Integrated PV',
       order: 5,
       features: JSON.stringify(['Integrated Manufacturing', 'Zero Defect Quality Control', 'High PID Resistance'])
     },
     {
       name: 'Luminous',
-      tagline: 'Household Name in Smart Inverters & Solar Power',
-      description: 'Luminous delivers smart grid-tie and hybrid solar inverters and panel solutions optimized for residential and light commercial users.',
+      tagline: 'Smart Inverters & Solar Power Systems',
+      description: 'Smart grid-tie and hybrid solar inverters optimized for residential and light commercial users.',
       category: 'Smart Inverters & PV',
       order: 6,
-      features: JSON.stringify(['Smart App Monitoring', 'Wide Voltage Range', 'Robust Local Service Network'])
+      features: JSON.stringify(['Smart Monitoring', 'Wide Voltage Range', 'Robust Local Service Support'])
     },
     {
       name: 'Sungrow',
-      tagline: 'Global Leader in Clean Power Inverters & Solutions',
-      description: 'Sungrow is the world’s most bankable inverter brand with industry-leading efficiency, smart fault protection, and remote telemetry.',
+      tagline: 'Global Leader in Clean Power Inverters',
+      description: 'Industry-leading efficiency, smart fault protection, and remote telemetry.',
       category: 'World-Class Inverters',
       order: 7,
       features: JSON.stringify(['98.8% Max Efficiency', 'AFCI Fire Protection', 'Seamless MPPT Tracking'])
     },
     {
       name: 'Solitech Solar',
-      tagline: 'Reliable High-Yield Photovoltaic Modules',
-      description: 'Solitech provides cost-effective, high-performing solar panels delivering fast investment amortization for homes and small businesses.',
+      tagline: 'High-Yield Photovoltaic Modules',
+      description: 'Cost-effective, high-performing solar panels delivering fast investment amortization.',
       category: 'High Value Solar',
       order: 8,
-      features: JSON.stringify(['High Return on Investment', 'Robust Mechanical Load 5400Pa', 'Weatherproof IP68 Junction'])
+      features: JSON.stringify(['High Return on Investment', 'Robust Mechanical Load 5400Pa', 'Weatherproof IP68 Protection'])
     }
   ];
 
@@ -272,8 +311,8 @@ function seedDefaultData() {
     {
       slug: 'commercial-solar',
       title: 'Commercial Solar Solutions',
-      short_description: 'Optimized on-grid solar plants for offices, hospitals, schools, and malls with rapid ROI and accelerated depreciation.',
-      full_description: 'Cut operational expenditures for your enterprise with custom-designed rooftop and carport solar systems. Take advantage of commercial tax depreciation benefits and sustainable green branding.',
+      short_description: 'Optimized on-grid solar plants for offices, hospitals, schools, and institutions with rapid ROI and accelerated depreciation.',
+      full_description: 'Cut operational expenditures for your enterprise with custom-designed rooftop and carport solar systems. Take advantage of commercial tax depreciation benefits and sustainable clean energy.',
       benefits: JSON.stringify(['Massive reduction in operational power costs', 'Accelerated depreciation tax benefits', 'Custom structural design for RCC & shed roofs', 'Smart cloud monitoring for power generation']),
       icon: 'Building2',
       order: 2
@@ -290,7 +329,7 @@ function seedDefaultData() {
     {
       slug: 'panel-supply',
       title: 'Solar Panel Supply',
-      short_description: 'Wholesale and retail supply of certified Tier-1 DCR and Non-DCR solar modules from top Indian & global brands.',
+      short_description: 'Wholesale and project supply of certified Tier-1 DCR and Non-DCR solar modules from top Indian & global brands.',
       full_description: 'As a trusted solar supplier, we provide verified solar panels from Adani, Tata Power, Waaree, RenewSys, and more, backed by manufacturer test reports and genuine warranty coverage.',
       benefits: JSON.stringify(['100% Genuine, tested manufacturer batches', 'DCR panels compliant with Central subsidy', 'Bifacial, Mono PERC, and TOPCon modules', 'Competitive pricing with prompt dispatch']),
       icon: 'Sun',
@@ -299,7 +338,7 @@ function seedDefaultData() {
     {
       slug: 'installation-commissioning',
       title: 'Installation & Commissioning',
-      short_description: 'Flawless execution by certified technicians adhering strictly to PWD, CEIG, and DISCOM electrical safety norms.',
+      short_description: 'Flawless execution by certified engineers adhering strictly to PWD, CEIG, and DISCOM electrical safety norms.',
       full_description: 'Atharva Enterprises holds an A Class Electrical Contractor license. Our engineers handle rigorous structural anchoring, lightning arrestors, chemical earthing, ACDB/DCDB boxes, and DISCOM commissioning.',
       benefits: JSON.stringify(['A Class Electrical Contractor certification', 'Professional CEIG & electrical safety compliance', 'High-grade GI/aluminium mounting structures', 'Turnkey DISCOM net-meter inspection approval']),
       icon: 'ShieldCheck',
@@ -310,7 +349,7 @@ function seedDefaultData() {
       title: 'Solar Maintenance & AMC',
       short_description: 'Preventive and breakdown maintenance, IV curve tracing, thermal imaging, and automated module cleaning.',
       full_description: 'Ensure maximum kilowatt-hour generation throughout the 25-year lifecycle with our comprehensive Annual Maintenance Contracts (AMC). We detect hot spots, loose terminations, and soiling losses before they hurt your yields.',
-      benefits: JSON.stringify(['Scheduled preventive inspection visits', 'Thermal imaging for micro-crack detection', 'String voltage & inverter efficiency checks', 'Priority on-site breakdown support']),
+      benefits: JSON.stringify(['Scheduled preventive inspection visits', 'Thermal imaging for micro-crack detection', 'String voltage & inverter efficiency checks', 'Priority technical support']),
       icon: 'Wrench',
       order: 6
     },
@@ -326,18 +365,18 @@ function seedDefaultData() {
     {
       slug: 'site-survey-design',
       title: 'Site Survey & System Design',
-      short_description: 'Precision drone mapping, 3D shadow analysis, roof structural health assessment, and detailed SLD schematics.',
+      short_description: 'Precision mapping, 3D shadow analysis, roof structural health assessment, and detailed SLD schematics.',
       full_description: 'Before any installation begins, our technical team executes in-depth shadow profiling, tilt optimization, and structural dead-load checks to deliver an engineered system with zero guesswork.',
-      benefits: JSON.stringify(['3D shadow analysis across 365 sun positions', 'Structural roof load calculation', 'Detailed Single Line Diagram (SLD) schematics', 'Expected generation yield simulation report']),
+      benefits: JSON.stringify(['3D shadow analysis across sun positions', 'Structural roof load calculation', 'Detailed Single Line Diagram (SLD) schematics', 'Expected generation yield simulation report']),
       icon: 'FileText',
       order: 8
     },
     {
       slug: 'after-sales-support',
       title: 'After-Sales & Warranty Support',
-      short_description: 'Dedicated helpline, warranty claims processing, and ongoing assistance for lifetime peace of mind.',
-      full_description: 'We do not walk away after commissioning. Our dedicated customer desk coordinates warranty replacements with brand manufacturers, assists with net-meter billing queries, and monitors system health.',
-      benefits: JSON.stringify(['Direct hotline support at +91 90390 05531', 'Hassle-free OEM warranty claim processing', 'Assistance with Discom net-billing audits', 'Continuous customer satisfaction commitment']),
+      short_description: 'Dedicated support, warranty claims processing, and ongoing assistance for lifetime peace of mind.',
+      full_description: 'We do not walk away after commissioning. Our customer desk coordinates warranty replacements with brand manufacturers, assists with net-meter billing queries, and monitors system health.',
+      benefits: JSON.stringify(['Direct online consultation portal', 'Hassle-free OEM warranty claim processing', 'Assistance with Discom net-billing audits', 'Continuous customer satisfaction commitment']),
       icon: 'UserCheck',
       order: 9
     }
@@ -355,103 +394,44 @@ function seedDefaultData() {
     }
   }
 
-  // 5. Seed a couple realistic sample appointments and enquiries for admin preview
-  const countEnquiries = db.prepare('SELECT COUNT(*) as cnt FROM enquiries').get().cnt;
-  if (countEnquiries === 0) {
-    const insertLead = db.prepare(`
-      INSERT INTO enquiries (reference_no, type, name, phone, email, city, property_type, monthly_bill, solar_capacity_kw, brand_interest, service_interest, message, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    insertLead.run(
-      'AE-ENQ-8192',
-      'quote',
-      'Rajesh Sharma',
-      '+91 98260 12345',
-      'rajesh.sharma@example.com',
-      'Bhopal',
-      'residential',
-      4200,
-      3.3,
-      'Tata Power Solar',
-      'Residential Solar Installation',
-      'Interested in 3 kW rooftop solar with PM Surya Ghar subsidy for my independent house in Arera Colony.',
-      'in_review',
-      'Customer called regarding 3kW on-grid system. Site visit scheduled for Sunday.'
-    );
-
-    insertLead.run(
-      'AE-ENQ-8193',
-      'subsidy_check',
-      'Vikram Patel',
-      '+91 94250 87654',
-      'vikram.patel@example.com',
-      'Indore',
-      'residential',
-      6800,
-      5.0,
-      'Adani Solar',
-      'Residential Solar Installation',
-      'Checking eligibility for central subsidy and net-metering setup in Vijay Nagar.',
-      'new',
-      'Requested subsidy document checklist via WhatsApp.'
-    );
-
-    insertLead.run(
-      'AE-ENQ-8194',
-      'brand_inquiry',
-      'Anand Verma (Industrial Fabrics)',
-      '+91 98930 45678',
-      'anand.fabrics@example.com',
-      'Jabalpur',
-      'commercial',
-      45000,
-      30.0,
-      'Waaree',
-      'Commercial Solar Solutions',
-      'Require quote for 30 kW rooftop setup on factory shed with Waaree or Sungrow inverters.',
-      'contacted',
-      'Shared technical brochure and preliminary SLD.'
-    );
-  }
-
+  // 5. Update or Seed Sample Appointments with online meeting types
   const countAppointments = db.prepare('SELECT COUNT(*) as cnt FROM appointments').get().cnt;
   if (countAppointments === 0) {
     const insertApt = db.prepare(`
-      INSERT INTO appointments (reference_no, full_name, phone, email, city, property_type, meeting_type, appointment_date, time_slot, bill_range, requirements, status, admin_notes)
+      INSERT INTO appointments (reference_no, full_name, email, city, property_type, meeting_type, appointment_date, time_slot, bill_range, requirements, status, admin_notes, meeting_link)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     insertApt.run(
-      'AE-APT-1001',
+      'AE-MTG-A81F-7740',
       'Dr. Sunil Kothari',
-      '+91 98270 34567',
       'dr.sunil@example.com',
       'Bhopal',
       'residential',
-      'site_visit',
-      '2026-11-15',
-      '11:30 AM - 01:00 PM',
+      'solar_consultation',
+      '2026-11-28',
+      '11:30 AM - 12:30 PM',
       '₹5,000 - ₹10,000',
-      'Need roof shadow assessment and proposal for 5kW solar installation with battery backup.',
+      'Need assessment and proposal for 5kW solar installation with battery backup.',
       'confirmed',
-      'Assigned lead engineer for site survey.'
+      'Assigned technical lead for initial online consultation.',
+      'https://meet.google.com/ath-arva-sol'
     );
 
     insertApt.run(
-      'AE-APT-1002',
+      'AE-MTG-B92C-3814',
       'Maheshwari Cold Storage',
-      '+91 97550 99881',
       'info@maheshwaricold.com',
       'Ujjain',
       'industrial',
-      'office_meeting',
-      '2026-11-17',
-      '02:00 PM - 03:30 PM',
+      'rooftop_discussion',
+      '2026-11-29',
+      '02:00 PM - 03:00 PM',
       'Above ₹10,000',
       'Discussion on 50kW industrial grid-tie solar and HT connection approvals.',
       'pending',
-      'Customer requested meeting at Atharva office.'
+      'Customer requested technical review meeting.',
+      null
     );
   }
 }
@@ -481,8 +461,7 @@ module.exports = {
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(visitorId, ipAddress || '', userAgent || '', deviceType || 'Desktop', pagePath || '/', referrer || 'Direct');
       return true;
-    } catch (err) {
-      console.error('Error recording site visit:', err);
+    } catch {
       return false;
     }
   },
@@ -514,8 +493,7 @@ module.exports = {
         recentVisits,
         devices
       };
-    } catch (err) {
-      console.error('Error fetching visitor analytics:', err);
+    } catch {
       return {
         totalViews: 0,
         uniqueVisitors: 0,

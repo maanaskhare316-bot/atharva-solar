@@ -2726,3 +2726,175 @@ img {
     flex: 1 1 100%;
   }
 }
+
+/* ==========================================================================
+   SECURE ONLINE MEETING BOOKING & SELF-SERVICE LOOKUP EXTENSIONS
+   ========================================================================== */
+
+/* FAQ Accordion */
+.faq-section {
+  background: var(--navy-900);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+}
+
+.faq-list {
+  max-width: 820px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.faq-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+.faq-item:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.faq-question {
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 1.25rem 1.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.faq-icon-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--solar-cyan);
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
+}
+
+.faq-question.active .faq-icon-arrow {
+  transform: rotate(180deg);
+  background: rgba(56, 189, 248, 0.2);
+}
+
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease, padding 0.25s ease;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  padding: 0 1.5rem;
+}
+
+.faq-answer.open {
+  max-height: 350px;
+  padding: 0 1.5rem 1.25rem 1.5rem;
+}
+
+/* Status Lookup Card */
+.status-lookup-wrapper {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.status-lookup-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 2.5rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.status-result-card {
+  background: var(--bg-card-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.75rem;
+  margin-top: 1.5rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.status-badge-lg {
+  display: inline-block;
+  padding: 0.45rem 1.15rem;
+  border-radius: 50px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.status-badge-lg.confirmed {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34D399;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+.status-badge-lg.pending {
+  background: rgba(245, 158, 11, 0.2);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.status-badge-lg.completed {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38BDF8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.status-badge-lg.cancelled, .status-badge-lg.rejected {
+  background: rgba(239, 68, 68, 0.2);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.meeting-link-box {
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 1.25rem;
+  margin-top: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Privacy Notice Pill */
+.privacy-notice-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: rgba(15, 29, 51, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-top: 1rem;
+}
+
+.privacy-notice-box svg {
+  color: var(--solar-cyan);
+  flex-shrink: 0;
+  margin-top: 2px;
+}

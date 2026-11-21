@@ -1,67 +1,82 @@
 /**
- * Atharva Enterprises - Request Validation & Helper Utilities
+ * Atharva Enterprises - Request Validation & Security Utilities
  */
 
+const crypto = require('node:crypto');
+
 /**
- * Validate Indian Mobile Number (10 digits, optionally starting with +91 or 0)
+ * Validate Email Address according to standard format
  */
-function isValidIndianPhone(phone) {
-  if (!phone || typeof phone !== 'string') return false;
-  const cleaned = phone.replace(/[\s\-\(\)]/g, '');
-  // Matches +9198XXXXXXXX, 9198XXXXXXXX, 098XXXXXXXX, 98XXXXXXXX
-  const regex = /^(?:\+?91|0)?[6-9]\d{9}$/;
-  return regex.test(cleaned);
+function isValidEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const trimmed = email.trim();
+  if (trimmed.length > 254) return false;
+  // Standard RFC 5322 regex
+  const regex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  return regex.test(trimmed);
 }
 
 /**
- * Normalize phone number to standard Indian format: +91 XXXXX XXXXX
+ * Sanitize untrusted text inputs (strip control characters and HTML entities)
  */
-function formatPhone(phone) {
-  if (!phone) return '';
-  const digits = phone.replace(/\D/g, '');
-  const last10 = digits.slice(-10);
-  if (last10.length === 10) {
-    return `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`;
-  }
-  return phone.trim();
+function sanitizeText(str, maxLen = 500) {
+  if (str === null || str === undefined) return '';
+  let cleaned = String(str)
+    .replace(/[<>'"&]/g, (char) => {
+      switch (char) {
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case "'": return '&#39;';
+        case '"': return '&quot;';
+        case '&': return '&amp;';
+        default: return char;
+      }
+    })
+    .replace(/[\x00-\x1F\x7F]/g, '') // Strip control characters
+    .trim();
+  return cleaned.slice(0, maxLen);
 }
 
 /**
- * Extract bare 12-digit Indian number for WhatsApp link (e.g. 919039005531)
+ * Generate an unpredictable, crypto-secure booking reference ID
+ * e.g. AE-MTG-A9E4-2C71
  */
-function getWhatsAppDigits(phone) {
-  if (!phone) return '919039005531';
-  const digits = phone.replace(/\D/g, '');
-  const last10 = digits.slice(-10);
-  return `91${last10}`;
+function generateSecureRefNumber(prefix = 'AE-MTG') {
+  const bytes = crypto.randomBytes(4).toString('hex').toUpperCase();
+  const part1 = bytes.slice(0, 4);
+  const part2 = bytes.slice(4, 8);
+  return `${prefix}-${part1}-${part2}`;
 }
 
 /**
- * Generate a unique human-friendly reference number
- * e.g. AE-APT-4921, AE-ENQ-9102
- */
-function generateRefNumber(prefix = 'AE') {
-  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-  const now = new Date();
-  const yearShort = now.getFullYear().toString().slice(-2);
-  return `${prefix}-${yearShort}${randomSuffix}`;
-}
-
-/**
- * Standard Available Time Slots
+ * Standard Available Meeting Time Slots
  */
 const STANDARD_TIME_SLOTS = [
-  '10:00 AM - 11:30 AM',
-  '11:30 AM - 01:00 PM',
-  '02:00 PM - 03:30 PM',
-  '03:30 PM - 05:00 PM',
-  '05:00 PM - 06:30 PM'
+  '10:00 AM - 11:00 AM',
+  '11:30 AM - 12:30 PM',
+  '02:00 PM - 03:00 PM',
+  '03:30 PM - 04:30 PM',
+  '05:00 PM - 06:00 PM'
 ];
 
+/**
+ * Allowed Online Meeting Types
+ */
+const MEETING_TYPES = {
+  solar_consultation: 'Solar Consultation',
+  rooftop_discussion: 'Rooftop Solar Installation Discussion',
+  subsidy_guidance: 'Subsidy Guidance',
+  technical_support: 'Technical Support',
+  general_enquiry: 'General Business Enquiry'
+};
+
+const VALID_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled', 'rejected'];
+
 module.exports = {
-  isValidIndianPhone,
-  formatPhone,
-  getWhatsAppDigits,
-  generateRefNumber,
-  STANDARD_TIME_SLOTS
+  isValidEmail,
+  sanitizeText,
+  generateSecureRefNumber,
+  STANDARD_TIME_SLOTS,
+  MEETING_TYPES,
+  VALID_STATUSES
 };

@@ -1,12 +1,12 @@
 /**
  * Atharva Enterprises - Public Client Application
- * Premium Interactive Solar Business Experience
+ * Premium Interactive Solar Business Experience & Secure Meeting Booking
  */
 
 (function () {
   'use strict';
 
-  // State
+  // Application State
   const state = {
     selectedDate: '',
     selectedSlot: '',
@@ -80,71 +80,48 @@
     setInterval(update, 1000);
   }
 
-  // 2. Solar Calculator & Subsidy Logic
-  function calculateSolar(monthlyBill) {
-    const bill = parseFloat(monthlyBill) || 3000;
-    const unitsPerMonth = bill / 7.5; // MP average ₹7.5/unit
-    let kw = (unitsPerMonth / 30) / 4; // 1kW generates ~4 units/day
-    kw = Math.max(1, Math.round(kw * 2) / 2);
+  // 2. Solar Calculator Slider Logic
+  function initCalculator() {
+    const slider = document.getElementById('calc-bill-range');
+    const display = document.getElementById('calc-bill-display');
+    if (!slider || !display) return;
 
-    const roofSqFt = Math.round(kw * 95);
+    slider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      display.textContent = `₹${val.toLocaleString('en-IN')}`;
+      recalculatePlan(val);
+    });
 
-    // PM Surya Ghar Subsidy Caps
-    let subsidy = 0;
-    if (kw >= 3) {
-      subsidy = 78000;
-    } else if (kw >= 2) {
-      subsidy = 60000;
-    } else if (kw >= 1) {
-      subsidy = 30000;
-    }
-
-    const grossCost = Math.round(kw * 60000);
-    const netCost = Math.max(0, grossCost - subsidy);
-    const annualSavings = Math.round(kw * 4 * 365 * 7.5);
-    const lifetimeSavings = Math.round((annualSavings * 25) - netCost);
-
-    return {
-      bill,
-      kw,
-      roofSqFt,
-      subsidy,
-      grossCost,
-      netCost,
-      annualSavings,
-      lifetimeSavings
-    };
+    recalculatePlan(4500);
   }
 
-  function initCalculator() {
-    const slider = document.getElementById('calc-bill-slider');
-    const billDisplay = document.getElementById('calc-bill-display');
+  async function recalculatePlan(bill) {
+    try {
+      const res = await fetch('/api/calculator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ monthlyBill: bill })
+      });
+      const data = await res.json();
+      if (!data.success || !data.result) return;
 
-    if (!slider) return;
+      const r = data.result;
+      const elCap = document.getElementById('res-capacity');
+      const elSub = document.getElementById('res-subsidy');
+      const elNet = document.getElementById('res-net-cost');
+      const elSav = document.getElementById('res-annual-savings');
+      const elPay = document.getElementById('res-payback');
+      const elRoof = document.getElementById('res-roof');
 
-    function renderCalc() {
-      const bill = parseInt(slider.value, 10);
-      if (billDisplay) billDisplay.textContent = `₹${bill.toLocaleString('en-IN')}`;
-
-      const res = calculateSolar(bill);
-
-      const capEl = document.getElementById('res-capacity');
-      const roofEl = document.getElementById('res-roof');
-      const subEl = document.getElementById('res-subsidy');
-      const netEl = document.getElementById('res-net-cost');
-      const savEl = document.getElementById('res-annual-savings');
-      const lifeEl = document.getElementById('res-lifetime-savings');
-
-      if (capEl) capEl.textContent = `${res.kw} kW`;
-      if (roofEl) roofEl.textContent = `${res.roofSqFt} sq. ft.`;
-      if (subEl) subEl.textContent = `₹${res.subsidy.toLocaleString('en-IN')}`;
-      if (netEl) netEl.textContent = `₹${res.netCost.toLocaleString('en-IN')}`;
-      if (savEl) savEl.textContent = `₹${res.annualSavings.toLocaleString('en-IN')} / yr`;
-      if (lifeEl) lifeEl.textContent = `₹${res.lifetimeSavings.toLocaleString('en-IN')}`;
+      if (elCap) elCap.textContent = `${r.recommendedCapacityKw.toFixed(1)} kW`;
+      if (elSub) elSub.textContent = `₹${r.subsidyAmount.toLocaleString('en-IN')}`;
+      if (elNet) elNet.textContent = `₹${r.netEstimatedCost.toLocaleString('en-IN')}`;
+      if (elSav) elSav.textContent = `₹${r.annualSavings.toLocaleString('en-IN')}/yr`;
+      if (elPay) elPay.textContent = `~${r.paybackPeriodYears} Years`;
+      if (elRoof) elRoof.textContent = `~${r.roofAreaSqFt} Sq.Ft`;
+    } catch (err) {
+      console.error('Error recalculating plan:', err);
     }
-
-    slider.addEventListener('input', renderCalc);
-    renderCalc();
   }
 
   // 3. Render Brands Grid
@@ -190,9 +167,9 @@
                 ${specsHtml}
               </ul>
             </div>
-            <button class="btn btn-secondary btn-sm" style="width:100%;margin-top:1rem;" onclick="window.openBrandInquiry('${b.name}')">
-              ${window.Icons.messageSquare} Inquire Available Stock
-            </button>
+            <a href="#schedule" class="btn btn-secondary btn-sm" style="width:100%;margin-top:1rem;justify-content:center;">
+              📅 Schedule Consultation
+            </a>
           </div>
         `;
       }).join('');
@@ -212,7 +189,7 @@
       if (!data.success || !data.services) return;
 
       state.services = data.services;
-      grid.innerHTML = data.services.map((s, idx) => {
+      grid.innerHTML = data.services.map((s) => {
         const iconKey = s.icon.toLowerCase();
         const iconSvg = window.Icons[iconKey] || window.Icons.sun;
 
@@ -227,9 +204,9 @@
               <button class="btn btn-secondary btn-sm" onclick="window.openServiceModal('${s.slug}')">
                 Learn More
               </button>
-              <button class="btn btn-primary btn-sm" onclick="window.openQuoteModal('${s.title}')">
-                Get a Quote
-              </button>
+              <a href="#schedule" class="btn btn-primary btn-sm">
+                Book Consultation
+              </a>
             </div>
           </div>
         `;
@@ -239,7 +216,7 @@
     }
   }
 
-  // 5. Interactive Meeting & Site Visit Scheduler
+  // 5. Interactive Meeting Scheduler
   async function loadSlotsForDate(dateStr) {
     const container = document.getElementById('slots-container');
     if (!container) return;
@@ -312,7 +289,7 @@
         e.preventDefault();
 
         if (!state.selectedSlot) {
-          showToast('Please select a preferred time slot', 'error');
+          showToast('Please select a preferred meeting time slot', 'error');
           return;
         }
 
@@ -322,7 +299,6 @@
 
         const payload = {
           fullName: document.getElementById('booking-name').value,
-          phone: document.getElementById('booking-phone').value,
           email: document.getElementById('booking-email').value,
           city: document.getElementById('booking-city').value,
           propertyType: document.getElementById('booking-property').value,
@@ -342,9 +318,9 @@
 
           const data = await res.json();
           if (!res.ok || !data.success) {
-            showToast(data.error || 'Failed to book appointment', 'error');
+            showToast(data.error || 'Failed to submit appointment request', 'error');
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Confirm Solar Consultation';
+            submitBtn.textContent = 'Submit Meeting Request';
             return;
           }
 
@@ -354,11 +330,11 @@
           state.selectedSlot = '';
           loadSlotsForDate(state.selectedDate);
           submitBtn.disabled = false;
-          submitBtn.textContent = 'Confirm Solar Consultation';
+          submitBtn.textContent = 'Submit Meeting Request';
         } catch (err) {
           showToast('Network error while scheduling. Please try again.', 'error');
           submitBtn.disabled = false;
-          submitBtn.textContent = 'Confirm Solar Consultation';
+          submitBtn.textContent = 'Submit Meeting Request';
         }
       });
     }
@@ -380,36 +356,37 @@
     const modal = document.getElementById('generic-modal');
     const content = document.getElementById('generic-modal-content');
 
-    const apt = data.appointment;
+    const booking = data.booking;
     content.innerHTML = `
       <div style="text-align:center;margin-bottom:1.5rem;">
         <div style="width:64px;height:64px;border-radius:50%;background:var(--solar-green-light);color:var(--solar-green);display:inline-flex;align-items:center;justify-content:center;margin-bottom:1rem;">
           ${window.Icons.checkCircle2}
         </div>
-        <h3 style="font-size:1.6rem;font-weight:800;color:var(--navy-900);margin-bottom:0.5rem;">Appointment Scheduled!</h3>
-        <p style="color:var(--text-muted);font-size:0.95rem;">Reference Number: <strong style="color:var(--navy-900);">${data.referenceNo}</strong></p>
+        <h3 style="font-size:1.6rem;font-weight:800;color:#FFFFFF;margin-bottom:0.5rem;">Meeting Request Submitted!</h3>
+        <p style="color:var(--text-muted);font-size:0.95rem;">Reference ID: <strong style="color:var(--solar-cyan);font-family:monospace;font-size:1.1rem;">${data.referenceNo}</strong></p>
       </div>
 
-      <div style="background:var(--navy-50);border-radius:var(--radius-md);padding:1.25rem;border:1px solid var(--border-color);margin-bottom:1.5rem;">
+      <div style="background:var(--bg-card-elevated);border-radius:var(--radius-md);padding:1.25rem;border:1px solid var(--border-color);margin-bottom:1.25rem;">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;font-size:0.875rem;">
-          <div><strong style="color:var(--text-muted);">Name:</strong><br>${apt.fullName}</div>
-          <div><strong style="color:var(--text-muted);">City:</strong><br>${apt.city}</div>
-          <div><strong style="color:var(--text-muted);">Date:</strong><br>${apt.appointmentDate}</div>
-          <div><strong style="color:var(--text-muted);">Slot:</strong><br>${apt.timeSlot}</div>
-          <div><strong style="color:var(--text-muted);">Type:</strong><br>${apt.meetingType.replace('_', ' ').toUpperCase()}</div>
-          <div><strong style="color:var(--text-muted);">Status:</strong><br><span class="status-badge pending">Pending Confirmation</span></div>
+          <div><strong style="color:var(--text-muted);">Name:</strong><br>${booking.fullName}</div>
+          <div><strong style="color:var(--text-muted);">Registered Email:</strong><br>${booking.email}</div>
+          <div><strong style="color:var(--text-muted);">Date:</strong><br>${booking.appointmentDate}</div>
+          <div><strong style="color:var(--text-muted);">Slot:</strong><br>${booking.timeSlot}</div>
+          <div><strong style="color:var(--text-muted);">Consultation:</strong><br>${booking.meetingType}</div>
+          <div><strong style="color:var(--text-muted);">Status:</strong><br><span class="status-badge pending">Under Review</span></div>
         </div>
       </div>
 
-      <p style="font-size:0.875rem;color:var(--text-muted);line-height:1.5;margin-bottom:1.5rem;text-align:center;">
-        Our technical survey engineer from Atharva Enterprises will call you at <strong>${apt.phone}</strong> to confirm site survey specifics.
-      </p>
+      <div class="privacy-notice-box" style="margin-bottom:1.5rem;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <span>An acknowledgment has been sent to <strong>${booking.email}</strong>. Once our engineering team approves the slot, your private Google Meet video room link will be sent to your inbox.</span>
+      </div>
 
-      <div style="display:flex;flex-direction:column;gap:0.75rem;">
-        <a href="${data.whatsappUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp" style="width:100%;">
-          ${window.Icons.whatsapp} Open WhatsApp Confirmation
-        </a>
-        <button class="btn btn-secondary" onclick="window.closeModal()">Close</button>
+      <div style="display:flex;gap:0.75rem;">
+        <button class="btn btn-secondary" onclick="window.closeModal()" style="flex:1;">Close</button>
+        <button class="btn btn-primary" onclick="window.closeModal(); window.scrollToLookup('${data.referenceNo}', '${booking.email}')" style="flex:1;">
+          Track Status
+        </button>
       </div>
     `;
 
@@ -450,173 +427,16 @@
 
       <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
         <button class="btn btn-secondary" onclick="window.closeModal()">Close</button>
-        <button class="btn btn-primary" onclick="window.closeModal(); window.openQuoteModal('${service.title}')">
-          Get a Quote for this Service
-        </button>
+        <a href="#schedule" class="btn btn-primary" onclick="window.closeModal()">
+          Book Online Consultation
+        </a>
       </div>
     `;
 
     modal.classList.add('active');
   };
 
-  window.openBrandInquiry = function (brandName) {
-    const modal = document.getElementById('generic-modal');
-    const content = document.getElementById('generic-modal-content');
-
-    content.innerHTML = `
-      <div style="margin-bottom:1.5rem;">
-        <span class="badge-tag badge-amber">Product Availability</span>
-        <h3 style="font-size:1.6rem;font-weight:800;color:var(--navy-900);margin-bottom:0.35rem;">Inquire About ${brandName}</h3>
-        <p style="color:var(--text-muted);font-size:0.9rem;">Check stock availability, module wattages (DCR/Non-DCR), and bulk supply pricing.</p>
-      </div>
-
-      <form id="brand-inquiry-form" onsubmit="window.handleBrandInquirySubmit(event, '${brandName}')">
-        <div style="display:grid;grid-template-columns:1fr;gap:1rem;margin-bottom:1.5rem;">
-          <div class="form-group">
-            <label class="form-label">Full Name <span class="required">*</span></label>
-            <input type="text" id="bi-name" class="form-input" required placeholder="e.g. Ramesh Kumar">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Mobile Number <span class="required">*</span></label>
-            <input type="tel" id="bi-phone" class="form-input" required placeholder="10-digit mobile number">
-          </div>
-          <div class="form-group">
-            <label class="form-label">City / Location</label>
-            <input type="text" id="bi-city" class="form-input" placeholder="e.g. Bhopal, Indore">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Requirement Details</label>
-            <textarea id="bi-message" class="form-textarea" rows="3" placeholder="Approx kW capacity, residential or commercial application"></textarea>
-          </div>
-        </div>
-        <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-          <button type="button" class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-amber">Submit Availability Request</button>
-        </div>
-      </form>
-    `;
-
-    modal.classList.add('active');
-  };
-
-  window.handleBrandInquirySubmit = async function (e, brandName) {
-    e.preventDefault();
-    const payload = {
-      type: 'brand_inquiry',
-      name: document.getElementById('bi-name').value,
-      phone: document.getElementById('bi-phone').value,
-      city: document.getElementById('bi-city').value,
-      brandInterest: brandName,
-      message: document.getElementById('bi-message').value
-    };
-
-    try {
-      const res = await fetch('/api/enquiries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        window.closeModal();
-        showToast(`Request for ${brandName} received! Ref: ${data.referenceNo}`, 'success');
-        if (data.whatsappUrl) {
-          window.open(data.whatsappUrl, '_blank');
-        }
-      } else {
-        showToast(data.error || 'Failed to submit enquiry', 'error');
-      }
-    } catch (err) {
-      showToast('Network error. Please try again.', 'error');
-    }
-  };
-
-  window.openQuoteModal = function (serviceName = '') {
-    const modal = document.getElementById('generic-modal');
-    const content = document.getElementById('generic-modal-content');
-
-    content.innerHTML = `
-      <div style="margin-bottom:1.5rem;">
-        <span class="badge-tag badge-green">Free Quotation</span>
-        <h3 style="font-size:1.6rem;font-weight:800;color:var(--navy-900);margin-bottom:0.35rem;">Request a Solar Quotation</h3>
-        <p style="color:var(--text-muted);font-size:0.9rem;">Receive an engineered proposal tailored to your roof and power requirements.</p>
-      </div>
-
-      <form id="quote-req-form" onsubmit="window.handleQuoteSubmit(event, '${serviceName}')">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
-          <div class="form-group">
-            <label class="form-label">Full Name <span class="required">*</span></label>
-            <input type="text" id="qr-name" class="form-input" required placeholder="e.g. Anand Sharma">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Mobile Number <span class="required">*</span></label>
-            <input type="tel" id="qr-phone" class="form-input" required placeholder="10-digit mobile number">
-          </div>
-          <div class="form-group">
-            <label class="form-label">City / Town</label>
-            <input type="text" id="qr-city" class="form-input" placeholder="e.g. Jabalpur, Gwalior">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Property Type</label>
-            <select id="qr-property" class="form-select">
-              <option value="residential">Residential Home</option>
-              <option value="commercial">Commercial Building</option>
-              <option value="industrial">Industrial Plant</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Avg. Monthly Bill (₹)</label>
-            <input type="number" id="qr-bill" class="form-input" placeholder="e.g. 5000">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Service Interested</label>
-            <input type="text" id="qr-service" class="form-input" value="${serviceName || 'Residential Solar Installation'}">
-          </div>
-        </div>
-        <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-          <button type="button" class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Request Quotation</button>
-        </div>
-      </form>
-    `;
-
-    modal.classList.add('active');
-  };
-
-  window.handleQuoteSubmit = async function (e, defaultService) {
-    e.preventDefault();
-    const payload = {
-      type: 'quote',
-      name: document.getElementById('qr-name').value,
-      phone: document.getElementById('qr-phone').value,
-      city: document.getElementById('qr-city').value,
-      propertyType: document.getElementById('qr-property').value,
-      monthlyBill: document.getElementById('qr-bill').value,
-      serviceInterest: document.getElementById('qr-service').value || defaultService
-    };
-
-    try {
-      const res = await fetch('/api/enquiries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        window.closeModal();
-        showToast(`Quotation request received! Ref: ${data.referenceNo}`, 'success');
-        if (data.whatsappUrl) {
-          window.open(data.whatsappUrl, '_blank');
-        }
-      } else {
-        showToast(data.error || 'Failed to submit quote request', 'error');
-      }
-    } catch (err) {
-      showToast('Network error. Please try again.', 'error');
-    }
-  };
-
-  // 7. General Contact Form
+  // 7. General Online Enquiry Form
   function initContactForm() {
     const form = document.getElementById('contact-form');
     if (!form) return;
@@ -624,9 +444,8 @@
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const payload = {
-        type: 'general_contact',
+        type: 'general_enquiry',
         name: document.getElementById('contact-name').value,
-        phone: document.getElementById('contact-phone').value,
         email: document.getElementById('contact-email').value,
         serviceInterest: document.getElementById('contact-service').value,
         message: document.getElementById('contact-message').value
@@ -641,7 +460,7 @@
         const data = await res.json();
         if (res.ok && data.success) {
           form.reset();
-          showToast(`Message received! Ref: ${data.referenceNo}. We will call you soon.`, 'success');
+          showToast(`Message received securely! Ref: ${data.referenceNo}. Our team will respond via email.`, 'success');
         } else {
           showToast(data.error || 'Could not send message', 'error');
         }
@@ -651,70 +470,137 @@
     });
   }
 
-  // 8. Subsidy Eligibility Form
-  function initSubsidyForm() {
-    const form = document.getElementById('subsidy-eligibility-form');
-    if (!form) return;
+  // 8. Customer Booking Status Lookup
+  window.handleStatusLookup = async function (e) {
+    if (e) e.preventDefault();
+    const ref = (document.getElementById('lookup-ref-input')?.value || '').trim();
+    const email = (document.getElementById('lookup-email-input')?.value || '').trim();
+    const resultBox = document.getElementById('booking-lookup-result');
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const payload = {
-        type: 'subsidy_check',
-        name: document.getElementById('sub-name').value,
-        phone: document.getElementById('sub-phone').value,
-        state: document.getElementById('sub-state').value,
-        propertyType: document.getElementById('sub-property').value,
-        monthlyBill: document.getElementById('sub-bill').value,
-        solarCapacityKw: document.getElementById('sub-capacity').value
-      };
+    if (!ref || !email) {
+      showToast('Please enter both your Reference ID and registered email', 'error');
+      return;
+    }
 
-      try {
-        const res = await fetch('/api/enquiries', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          form.reset();
-          showToast(`Subsidy eligibility enquiry logged! Ref: ${data.referenceNo}`, 'success');
-          if (data.whatsappUrl) {
-            window.open(data.whatsappUrl, '_blank');
-          }
-        } else {
-          showToast(data.error || 'Submission failed', 'error');
-        }
-      } catch (err) {
-        showToast('Network error. Please try again.', 'error');
+    resultBox.style.display = 'block';
+    resultBox.innerHTML = '<div style="padding:1rem;color:var(--text-muted);font-size:0.875rem;">Verifying booking credentials...</div>';
+
+    try {
+      const res = await fetch('/api/appointments/status-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referenceNo: ref, email: email })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        resultBox.innerHTML = `
+          <div class="status-result-card" style="border-color:#EF4444;background:rgba(239,68,68,0.1);">
+            <div style="color:#F87171;font-weight:700;margin-bottom:0.25rem;">Verification Failed</div>
+            <div style="font-size:0.875rem;color:#CBD5E1;">${data.error || 'No booking found matching the provided details.'}</div>
+          </div>
+        `;
+        return;
       }
-    });
-  }
 
-  // 9. Appointment Lookup
-  window.openLookupModal = function () {
+      const isConfirmed = data.status === 'confirmed';
+
+      resultBox.innerHTML = `
+        <div class="status-result-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+            <div>
+              <span style="font-size:0.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">Reference ID</span>
+              <div style="font-size:1.2rem;font-weight:900;color:#FFFFFF;font-family:monospace;">${data.referenceNo}</div>
+            </div>
+            <span class="status-badge-lg ${data.status}">
+              ${data.status}
+            </span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;font-size:0.875rem;margin-bottom:1rem;">
+            <div><strong style="color:var(--text-muted);">Customer:</strong><br>${data.customerName}</div>
+            <div><strong style="color:var(--text-muted);">Meeting Type:</strong><br>${data.meetingType}</div>
+            <div><strong style="color:var(--text-muted);">Confirmed Date:</strong><br>📅 ${data.appointmentDate}</div>
+            <div><strong style="color:var(--text-muted);">Time Slot:</strong><br>⏰ ${data.timeSlot}</div>
+          </div>
+
+          <div style="font-size:0.85rem;color:#38BDF8;background:rgba(56,189,248,0.1);padding:0.75rem 1rem;border-radius:8px;border:1px solid rgba(56,189,248,0.25);">
+            ℹ️ ${data.meetingNotice}
+          </div>
+
+          ${isConfirmed && data.privateMeetingUrl ? `
+            <div class="meeting-link-box">
+              <div>
+                <strong style="color:#FFFFFF;display:block;margin-bottom:0.25rem;">Google Meet Private Room</strong>
+                <span style="font-size:0.8rem;color:#94A3B8;">Camera & microphone recommended</span>
+              </div>
+              <a href="${data.privateMeetingUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">
+                Join Online Meeting →
+              </a>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    } catch (err) {
+      resultBox.innerHTML = '<div style="color:#EF4444;font-size:0.85rem;padding:1rem;">Network error. Please try again.</div>';
+    }
+  };
+
+  window.scrollToLookup = function (ref = '', email = '') {
+    const section = document.getElementById('track-booking');
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth' });
+    }
+    if (ref && document.getElementById('lookup-ref-input')) {
+      document.getElementById('lookup-ref-input').value = ref;
+    }
+    if (email && document.getElementById('lookup-email-input')) {
+      document.getElementById('lookup-email-input').value = email;
+    }
+  };
+
+  // 9. FAQ Accordion Toggle
+  window.toggleFaq = function (btnEl) {
+    const answer = btnEl.nextElementSibling;
+    const isActive = btnEl.classList.contains('active');
+
+    // Close all FAQs first
+    document.querySelectorAll('.faq-question').forEach(q => q.classList.remove('active'));
+    document.querySelectorAll('.faq-answer').forEach(a => a.classList.remove('open'));
+
+    // Open target if not already active
+    if (!isActive) {
+      btnEl.classList.add('active');
+      answer.classList.add('open');
+    }
+  };
+
+  // 10. Privacy & Legal Modals
+  window.openPrivacyModal = function () {
     const modal = document.getElementById('generic-modal');
     const content = document.getElementById('generic-modal-content');
 
     content.innerHTML = `
       <div style="margin-bottom:1.5rem;">
-        <span class="badge-tag badge-blue">Self Service</span>
-        <h3 style="font-size:1.6rem;font-weight:800;color:var(--navy-900);margin-bottom:0.35rem;">Track Scheduled Appointment</h3>
-        <p style="color:var(--text-muted);font-size:0.9rem;">Enter your booking reference number and mobile number to view status.</p>
+        <span class="badge-tag badge-blue">Data Protection & Confidentiality</span>
+        <h3 style="font-size:1.6rem;font-weight:800;color:var(--navy-900);margin-bottom:0.5rem;">Privacy Policy</h3>
+        <p style="color:var(--text-muted);font-size:0.85rem;">Last Updated: November 2026</p>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:1rem;margin-bottom:1.5rem;">
-        <div class="form-group">
-          <label class="form-label">Booking Reference Number <span class="required">*</span></label>
-          <input type="text" id="lookup-ref" class="form-input" placeholder="e.g. AE-APT-1001">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Registered Phone Number</label>
-          <input type="tel" id="lookup-phone" class="form-input" placeholder="e.g. 9827034567">
-        </div>
-        <button class="btn btn-primary" onclick="window.executeAppointmentLookup()">Check Status</button>
-      </div>
+      <div style="max-height:360px;overflow-y:auto;padding-right:0.5rem;font-size:0.875rem;color:var(--text-main);line-height:1.7;">
+        <h4 style="color:var(--navy-900);margin:0.75rem 0 0.25rem;">1. Information We Collect</h4>
+        <p>Atharva Enterprises collects only information strictly required to coordinate and schedule your solar engineering consultations: your full name, email address, city/location, and optional details regarding your monthly power bill or roof space.</p>
 
-      <div id="lookup-result-area"></div>
+        <h4 style="color:var(--navy-900);margin:0.75rem 0 0.25rem;">2. Purpose of Processing</h4>
+        <p>We process your data exclusively to verify consultation requests, assign qualified electrical engineers, and privately transmit your Google Meet room link.</p>
+
+        <h4 style="color:var(--navy-900);margin:0.75rem 0 0.25rem;">3. Zero Commercial Disclosure</h4>
+        <p>We never sell, rent, or distribute your email or personal information to third-party telemarketers, lead aggregators, or external advertisers.</p>
+
+        <h4 style="color:var(--navy-900);margin:0.75rem 0 0.25rem;">4. Data Retention & Deletion</h4>
+        <p>Consultation records are stored securely for 2 years for statutory compliance under PWD contracting audit guidelines. You may request deletion of your records anytime via our online enquiry portal.</p>
+      </div>
 
       <div style="display:flex;justify-content:flex-end;margin-top:1.5rem;">
         <button class="btn btn-secondary" onclick="window.closeModal()">Close</button>
@@ -724,49 +610,58 @@
     modal.classList.add('active');
   };
 
-  window.executeAppointmentLookup = async function () {
-    const ref = document.getElementById('lookup-ref').value;
-    const phone = document.getElementById('lookup-phone').value;
-    const resultArea = document.getElementById('lookup-result-area');
+  window.openTermsModal = function () {
+    const modal = document.getElementById('generic-modal');
+    const content = document.getElementById('generic-modal-content');
 
-    if (!ref) {
-      showToast('Please enter reference number', 'error');
-      return;
-    }
+    content.innerHTML = `
+      <div style="margin-bottom:1.5rem;">
+        <span class="badge-tag badge-green">Terms of Service</span>
+        <h3 style="font-size:1.6rem;font-weight:800;color:var(--navy-900);margin-bottom:0.5rem;">Consultation Terms</h3>
+      </div>
 
-    resultArea.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Searching booking records...</div>';
+      <div style="max-height:360px;overflow-y:auto;padding-right:0.5rem;font-size:0.875rem;color:var(--text-main);line-height:1.7;">
+        <p><strong>1. Non-Binding Guidance:</strong> Online solar consultations and estimated savings provided through our portal are for technical advisory purposes. Official turnkey contracts are formalized after physical site verification.</p>
+        <p style="margin-top:0.75rem;"><strong>2. Subsidy Approval:</strong> Central subsidy under PM Surya Ghar Muft Bijli Yojana is administered by national and DISCOM authorities. Atharva Enterprises assists with documentation but final grant is governed by government regulations.</p>
+        <p style="margin-top:0.75rem;"><strong>3. Attendance & Rescheduling:</strong> Please join your scheduled Google Meet room on time. If you need to reschedule, notify us via our enquiry portal at least 4 hours in advance.</p>
+      </div>
 
-    try {
-      const res = await fetch(`/api/appointments/lookup?ref=${encodeURIComponent(ref)}&phone=${encodeURIComponent(phone)}`);
-      const data = await res.json();
+      <div style="display:flex;justify-content:flex-end;margin-top:1.5rem;">
+        <button class="btn btn-secondary" onclick="window.closeModal()">Close</button>
+      </div>
+    `;
 
-      if (!res.ok || !data.success || !data.appointment) {
-        resultArea.innerHTML = `<div style="padding:0.75rem;background:#FEE2E2;color:#991B1B;border-radius:6px;font-size:0.85rem;">${data.error || 'No appointment found with this reference number.'}</div>`;
-        return;
-      }
-
-      const a = data.appointment;
-      resultArea.innerHTML = `
-        <div style="background:var(--navy-50);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:1.25rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
-            <strong style="color:var(--navy-900);font-size:1.1rem;">${a.reference_no}</strong>
-            <span class="status-badge ${a.status}">${a.status}</span>
-          </div>
-          <div style="font-size:0.875rem;display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;color:var(--text-main);">
-            <div><strong>Client:</strong> ${a.full_name}</div>
-            <div><strong>City:</strong> ${a.city}</div>
-            <div><strong>Date:</strong> ${a.appointment_date}</div>
-            <div><strong>Slot:</strong> ${a.time_slot}</div>
-            <div><strong>Meeting:</strong> ${a.meeting_type.replace('_', ' ').toUpperCase()}</div>
-          </div>
-        </div>
-      `;
-    } catch (err) {
-      resultArea.innerHTML = '<div style="color:#EF4444;font-size:0.85rem;">Error fetching booking details.</div>';
-    }
+    modal.classList.add('active');
   };
 
-  // 10. Mobile Menu Toggle
+  window.openSecurityModal = function () {
+    const modal = document.getElementById('generic-modal');
+    const content = document.getElementById('generic-modal-content');
+
+    content.innerHTML = `
+      <div style="margin-bottom:1.5rem;">
+        <span class="badge-tag badge-blue">Infrastructure Security</span>
+        <h3 style="font-size:1.6rem;font-weight:800;color:var(--navy-900);margin-bottom:0.5rem;">Security Architecture</h3>
+      </div>
+
+      <div style="font-size:0.875rem;color:var(--text-main);line-height:1.7;">
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:0.75rem;">
+          <li>🛡️ <strong>Password Hashing:</strong> Administrative credentials protected using PBKDF2 with SHA-512 and cryptographic salts.</li>
+          <li>🔒 <strong>Private Link Transmission:</strong> Online meeting rooms are assigned exclusively to verified applicants and never listed publicly.</li>
+          <li>⚡ <strong>Anti-Enumeration Protection:</strong> Booking status lookups require matching Reference ID and exact registered email with rate-limit defense.</li>
+          <li>🛡️ <strong>Defense in Depth:</strong> Strict Content Security Policy, XSS filtering, parameterized SQLite queries, and atomic double-booking prevention.</li>
+        </ul>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;margin-top:1.5rem;">
+        <button class="btn btn-secondary" onclick="window.closeModal()">Close</button>
+      </div>
+    `;
+
+    modal.classList.add('active');
+  };
+
+  // 11. Mobile Menu Toggle
   function initMobileMenu() {
     const toggleBtn = document.getElementById('mobile-toggle-btn');
     const drawer = document.getElementById('mobile-nav-drawer');
@@ -783,7 +678,7 @@
     });
   }
 
-  // 11. Anonymous Visitor Traffic Tracker (Feeds Admin Analytics)
+  // 12. Anonymous Visitor Traffic Tracker
   function trackVisitor() {
     try {
       let vid = localStorage.getItem('ae_visitor_id');
@@ -800,7 +695,7 @@
           referrer: document.referrer || 'Direct'
         })
       }).catch(() => {});
-    } catch (e) {
+    } catch {
       // Non-blocking
     }
   }
@@ -814,7 +709,6 @@
     loadServices();
     initScheduler();
     initContactForm();
-    initSubsidyForm();
     initMobileMenu();
   });
 
