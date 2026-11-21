@@ -270,62 +270,77 @@
 
   window.switchAdminTab = switchTab;
 
-  // TAB 1: Online Meetings & Consultations Command Center (Clean & Beginner-Friendly)
+  // Date Formatter Helper (e.g. 2026-11-29 -> Nov 29, 2026)
+  function formatDateClean(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const parts = String(dateStr).split('-');
+      if (parts.length === 3) {
+        const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+      return dateStr;
+    } catch {
+      return dateStr;
+    }
+  }
+
+  // TAB 1: Online Consultation Appointments (Clean Minimalist Theme)
   async function renderAppointmentsTab(container) {
     container.innerHTML = `
-      <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);padding:1.5rem 1.75rem;margin-bottom:1.5rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
+      <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.03);padding:1.25rem 1.5rem;margin-bottom:1.25rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.15rem;">
           <div>
-            <h2 style="font-size:1.45rem;font-weight:800;color:#0B1628;letter-spacing:-0.02em;margin-bottom:0.25rem;">
-              📅 Customer Consultation Bookings (ग्राहक मीटिंग्स)
+            <h2 style="font-size:1.3rem;font-weight:700;color:#0B1628;letter-spacing:-0.02em;margin-bottom:0.2rem;">
+              Appointments
             </h2>
-            <p style="font-size:0.875rem;color:#64748B;">
-              Every appointment booked on the public website appears here in real-time. Click <strong>"Approve"</strong> or <strong>"Generate Meet"</strong> to confirm.
+            <p style="font-size:0.825rem;color:#64748B;margin:0;">
+              Customer consultation bookings and video meeting management.
             </p>
           </div>
-          <div style="display:flex;gap:0.65rem;flex-wrap:wrap;">
-            <button class="btn btn-sm" onclick="window.loadAndDisplayAppointments()" style="background:#16845B;color:#FFFFFF;border:none;padding:0.5rem 1rem;border-radius:8px;font-size:0.85rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;box-shadow:0 2px 6px rgba(22,132,91,0.25);">
-              🔄 Refresh List (ताज़ा करें)
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <button class="admin-action-btn admin-action-btn-secondary" onclick="window.loadAndDisplayAppointments()">
+              Refresh
             </button>
-            <button class="btn btn-sm" onclick="window.exportAppointmentsCSV()" style="background:#F8FAFC;color:#0284C7;border:1.5px solid #CBD5E1;padding:0.5rem 0.95rem;border-radius:8px;font-size:0.85rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
-              ${window.Icons.download} Export CSV
+            <button class="admin-action-btn admin-action-btn-secondary" onclick="window.exportAppointmentsCSV()">
+              Export CSV
             </button>
-            <button class="btn btn-sm" onclick="window.openBlockDateModal()" style="background:#FFFBEB;color:#B45309;border:1.5px solid #FCD34D;padding:0.5rem 0.95rem;border-radius:8px;font-size:0.85rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
-              ${window.Icons.calendar} Block Date / Slot
+            <button class="admin-action-btn admin-action-btn-secondary" onclick="window.openBlockDateModal()">
+              Block Date / Slot
             </button>
           </div>
         </div>
 
         <!-- Filter Chips & Search Bar -->
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;padding-top:1rem;border-top:1px solid #F1F5F9;">
-          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="appointment-filter-chips">
-            <button class="btn btn-sm" style="background:#0284C7;color:#FFFFFF;border:none;border-radius:20px;padding:0.4rem 1rem;font-weight:700;cursor:pointer;" onclick="window.setAppointmentFilter('all', this)">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;padding-top:0.85rem;border-top:1px solid #F1F5F9;">
+          <div style="display:flex;gap:0.4rem;flex-wrap:wrap;" id="appointment-filter-chips">
+            <button class="btn btn-sm" style="background:#0F172A;color:#FFFFFF;border:none;border-radius:6px;padding:0.35rem 0.85rem;font-size:0.8rem;font-weight:600;cursor:pointer;" onclick="window.setAppointmentFilter('all', this)">
               All Bookings (<span id="count-all-apts">0</span>)
             </button>
-            <button class="btn btn-sm" style="background:#F1F5F9;color:#92400E;border:1px solid #FCD34D;border-radius:20px;padding:0.4rem 1rem;font-weight:700;cursor:pointer;" onclick="window.setAppointmentFilter('pending', this)">
-              ⏳ Pending (<span id="count-pending-apts">0</span>)
+            <button class="btn btn-sm" style="background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;padding:0.35rem 0.85rem;font-size:0.8rem;font-weight:600;cursor:pointer;" onclick="window.setAppointmentFilter('pending', this)">
+              Pending (<span id="count-pending-apts">0</span>)
             </button>
-            <button class="btn btn-sm" style="background:#F1F5F9;color:#065F46;border:1px solid #6EE7B7;border-radius:20px;padding:0.4rem 1rem;font-weight:700;cursor:pointer;" onclick="window.setAppointmentFilter('confirmed', this)">
-              ✅ Confirmed (<span id="count-confirmed-apts">0</span>)
+            <button class="btn btn-sm" style="background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;padding:0.35rem 0.85rem;font-size:0.8rem;font-weight:600;cursor:pointer;" onclick="window.setAppointmentFilter('confirmed', this)">
+              Confirmed (<span id="count-confirmed-apts">0</span>)
             </button>
-            <button class="btn btn-sm" style="background:#F1F5F9;color:#0369A1;border:1px solid #7DD3FC;border-radius:20px;padding:0.4rem 1rem;font-weight:700;cursor:pointer;" onclick="window.setAppointmentFilter('today', this)">
-              📅 Today (<span id="count-today-apts">0</span>)
+            <button class="btn btn-sm" style="background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;padding:0.35rem 0.85rem;font-size:0.8rem;font-weight:600;cursor:pointer;" onclick="window.setAppointmentFilter('today', this)">
+              Today (<span id="count-today-apts">0</span>)
             </button>
-            <button class="btn btn-sm" style="background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;border-radius:20px;padding:0.4rem 1rem;font-weight:700;cursor:pointer;" onclick="window.setAppointmentFilter('completed', this)">
-              🏁 Completed (<span id="count-completed-apts">0</span>)
+            <button class="btn btn-sm" style="background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0;border-radius:6px;padding:0.35rem 0.85rem;font-size:0.8rem;font-weight:600;cursor:pointer;" onclick="window.setAppointmentFilter('completed', this)">
+              Completed (<span id="count-completed-apts">0</span>)
             </button>
           </div>
 
           <!-- Live Search Input -->
-          <div style="min-width:260px;flex:1;max-width:380px;">
-            <input type="text" id="appointment-search-input" class="form-input" placeholder="🔍 Search customer, email, city, ref ID..." oninput="window.filterAppointmentsLive()" style="padding:0.55rem 0.95rem;font-size:0.875rem;border:1.5px solid #CBD5E1;border-radius:8px;background:#F8FAFC;width:100%;box-sizing:border-box;">
+          <div style="min-width:240px;flex:1;max-width:340px;">
+            <input type="text" id="appointment-search-input" class="form-input" placeholder="Search customer, email, city, ref ID..." oninput="window.filterAppointmentsLive()" style="padding:0.45rem 0.85rem;font-size:0.825rem;border:1px solid #CBD5E1;border-radius:6px;background:#FFFFFF;width:100%;box-sizing:border-box;">
           </div>
         </div>
       </div>
 
       <!-- Bookings Table Container -->
       <div id="appointments-table-wrap" class="admin-table-container">
-        <div style="padding:3rem;text-align:center;color:#64748B;">Loading consultation bookings...</div>
+        <div style="padding:3rem;text-align:center;color:#64748B;font-size:0.875rem;">Loading appointments...</div>
       </div>
     `;
 
@@ -337,12 +352,14 @@
   window.setAppointmentFilter = function (filter, btnEl) {
     adminState.appointmentFilter = filter;
     document.querySelectorAll('#appointment-filter-chips button').forEach(b => {
-      b.style.background = '#F1F5F9';
-      b.style.color = '#334155';
+      b.style.background = '#F8FAFC';
+      b.style.color = '#64748B';
+      b.style.border = '1px solid #E2E8F0';
     });
     if (btnEl) {
-      btnEl.style.background = '#0284C7';
+      btnEl.style.background = '#0F172A';
       btnEl.style.color = '#FFFFFF';
+      btnEl.style.border = '1px solid #0F172A';
     }
     window.filterAppointmentsLive();
   };
@@ -426,10 +443,9 @@
 
     if (apts.length === 0) {
       wrap.innerHTML = `
-        <div style="padding:4rem 2rem;text-align:center;">
-          <div style="font-size:2.5rem;margin-bottom:0.75rem;">📅</div>
-          <h3 style="font-size:1.15rem;font-weight:700;color:#0B1628;margin-bottom:0.35rem;">No Bookings Found</h3>
-          <p style="color:#64748B;font-size:0.875rem;">No consultation bookings match your current search or filter.</p>
+        <div style="padding:3.5rem 2rem;text-align:center;">
+          <h3 style="font-size:1.05rem;font-weight:600;color:#0B1628;margin-bottom:0.25rem;">No Bookings Found</h3>
+          <p style="color:#64748B;font-size:0.825rem;margin:0;">No consultation bookings match your current filter or search criteria.</p>
         </div>
       `;
       return;
@@ -441,12 +457,12 @@
       <table class="admin-modern-table">
         <thead>
           <tr>
-            <th>Customer &amp; Ref ID</th>
-            <th>Consultation Date &amp; Slot</th>
-            <th>Type &amp; Location</th>
-            <th>Google Meet Link</th>
-            <th>Status</th>
-            <th>Quick Actions</th>
+            <th style="padding:0.75rem 1rem;">Customer</th>
+            <th style="padding:0.75rem 1rem;">Schedule</th>
+            <th style="padding:0.75rem 1rem;">Service &amp; Location</th>
+            <th style="padding:0.75rem 1rem;">Meeting Link</th>
+            <th style="padding:0.75rem 1rem;">Status</th>
+            <th style="padding:0.75rem 1rem;">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -456,90 +472,90 @@
             const isPending = a.status === 'pending';
             const isConfirmed = a.status === 'confirmed';
 
-            let statusBadge = `<span class="badge-pending">⏳ Under Review</span>`;
-            if (a.status === 'confirmed') statusBadge = `<span class="badge-confirmed">✅ Confirmed</span>`;
-            else if (a.status === 'completed') statusBadge = `<span class="badge-completed">🏁 Completed</span>`;
-            else if (a.status === 'cancelled') statusBadge = `<span class="badge-cancelled">❌ Cancelled</span>`;
-            else if (a.status === 'rejected') statusBadge = `<span class="badge-cancelled">🚫 Rejected</span>`;
+            let statusBadge = `<span class="badge-pill badge-pending"><span class="badge-dot"></span>Pending</span>`;
+            if (a.status === 'confirmed') statusBadge = `<span class="badge-pill badge-confirmed"><span class="badge-dot"></span>Confirmed</span>`;
+            else if (a.status === 'completed') statusBadge = `<span class="badge-pill badge-completed"><span class="badge-dot"></span>Completed</span>`;
+            else if (a.status === 'cancelled') statusBadge = `<span class="badge-pill badge-cancelled"><span class="badge-dot"></span>Cancelled</span>`;
+            else if (a.status === 'rejected') statusBadge = `<span class="badge-pill badge-cancelled"><span class="badge-dot"></span>Rejected</span>`;
 
             return `
               <tr style="${isPending ? 'background:#FFFDF7;' : ''}">
-                <td>
-                  <strong style="color:#0B1628;font-size:1rem;display:block;">${a.full_name}</strong>
-                  <span style="font-size:0.825rem;color:#0284C7;display:block;margin-top:2px;">✉️ ${a.email}</span>
+                <td style="padding:0.85rem 1rem;">
+                  <div style="color:#0F172A;font-weight:600;font-size:0.9rem;">${a.full_name}</div>
+                  <div style="font-size:0.8rem;color:#64748B;margin-top:2px;">${a.email}</div>
                   <div style="margin-top:4px;">
-                    <code style="font-size:0.75rem;background:#F1F5F9;padding:2px 6px;border-radius:4px;color:#475569;font-family:monospace;border:1px solid #E2E8F0;">
+                    <code style="font-size:0.725rem;background:#F1F5F9;padding:2px 6px;border-radius:4px;color:#475569;font-family:monospace;border:1px solid #E2E8F0;">
                       ${a.reference_no}
                     </code>
                   </div>
                 </td>
-                <td>
-                  <div style="font-weight:800;font-size:0.925rem;color:#0F172A;">
-                    📅 ${a.appointment_date}
-                    ${isToday ? '<span style="background:#EF4444;color:#FFFFFF;padding:2px 6px;border-radius:4px;font-size:0.65rem;font-weight:800;margin-left:4px;">TODAY</span>' : ''}
+                <td style="padding:0.85rem 1rem;white-space:nowrap;">
+                  <div style="font-weight:600;font-size:0.875rem;color:#0F172A;">
+                    ${formatDateClean(a.appointment_date)}
+                    ${isToday ? '<span style="background:#EF4444;color:#FFFFFF;padding:1px 5px;border-radius:3px;font-size:0.65rem;font-weight:700;margin-left:4px;">TODAY</span>' : ''}
                   </div>
-                  <div style="color:#0284C7;font-weight:700;font-size:0.825rem;margin-top:3px;">
-                    ⏰ ${a.time_slot}
+                  <div style="color:#64748B;font-size:0.8rem;margin-top:2px;">
+                    ${a.time_slot}
                   </div>
                 </td>
-                <td>
-                  <span style="font-weight:700;color:#334155;text-transform:capitalize;font-size:0.85rem;">
+                <td style="padding:0.85rem 1rem;">
+                  <div style="font-weight:600;color:#0F172A;text-transform:capitalize;font-size:0.85rem;">
                     ${(a.meeting_type || 'solar_consultation').replace(/_/g, ' ')}
-                  </span>
-                  <div style="font-size:0.8rem;color:#16845B;font-weight:600;margin-top:2px;">
-                    📍 ${a.city || 'Madhya Pradesh'} (${(a.property_type || 'residential').toUpperCase()})
                   </div>
-                  ${a.requirements ? `<div style="font-size:0.775rem;color:#64748B;font-style:italic;margin-top:3px;max-width:200px;">"${a.requirements}"</div>` : ''}
+                  <div style="font-size:0.775rem;color:#64748B;margin-top:2px;">
+                    ${a.city || 'Madhya Pradesh'} &bull; ${(a.property_type || 'residential').toUpperCase()}
+                  </div>
+                  ${a.requirements ? `<div style="font-size:0.75rem;color:#64748B;font-style:italic;margin-top:3px;max-width:220px;">"${a.requirements}"</div>` : ''}
                 </td>
-                <td>
+                <td style="padding:0.85rem 1rem;">
                   ${hasMeetLink ? `
-                    <div style="display:flex;align-items:center;gap:0.4rem;">
-                      <a href="${a.meeting_link}" target="_blank" rel="noopener noreferrer" style="background:#0284C7;color:#FFFFFF;padding:0.4rem 0.75rem;border-radius:6px;font-size:0.8rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:0.35rem;" title="Join Google Meet video room">
-                        🎥 Join Meet
+                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                      <a href="${a.meeting_link}" target="_blank" rel="noopener noreferrer" class="admin-action-btn admin-action-btn-meet" title="Join Google Meet video room">
+                        Join Meet &nearr;
                       </a>
-                      <button class="btn btn-sm" onclick="window.openAssignMeetModal(${a.id}, '${a.meeting_link}')" title="Edit Meeting Link" style="background:#FFFFFF;border:1px solid #CBD5E1;padding:0.35rem 0.55rem;border-radius:6px;font-size:0.75rem;cursor:pointer;">
-                        ✏️
+                      <button class="admin-action-btn admin-action-btn-secondary" onclick="window.openAssignMeetModal(${a.id}, '${a.meeting_link}')" title="Edit Meeting Link" style="padding:0.35rem 0.55rem;font-size:0.75rem;">
+                        Edit
                       </button>
                     </div>
                   ` : `
-                    <div style="display:flex;gap:0.4rem;">
-                      <button class="btn btn-sm" onclick="window.autoGenerateMeet(${a.id})" style="background:#0284C7;color:#FFFFFF;border:none;padding:0.4rem 0.75rem;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.3rem;" title="Auto generate Google Meet room">
-                        ⚡ Generate Meet
+                    <div style="display:flex;gap:0.35rem;">
+                      <button class="admin-action-btn admin-action-btn-dark" onclick="window.autoGenerateMeet(${a.id})" title="Auto generate Google Meet room">
+                        Generate Link
                       </button>
-                      <button class="btn btn-sm" onclick="window.openAssignMeetModal(${a.id}, '')" style="background:#FFFFFF;border:1px solid #CBD5E1;color:#475569;padding:0.4rem 0.55rem;border-radius:6px;font-size:0.75rem;cursor:pointer;" title="Paste meeting link manually">
+                      <button class="admin-action-btn admin-action-btn-secondary" onclick="window.openAssignMeetModal(${a.id}, '')" title="Paste meeting link manually" style="padding:0.35rem 0.55rem;font-size:0.75rem;">
                         Paste
                       </button>
                     </div>
                   `}
                 </td>
-                <td>
+                <td style="padding:0.85rem 1rem;">
                   ${statusBadge}
                 </td>
-                <td>
-                  <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
+                <td style="padding:0.85rem 1rem;">
+                  <div style="display:flex;gap:0.35rem;align-items:center;flex-wrap:wrap;">
                     ${isPending ? `
-                      <button class="btn btn-sm" onclick="window.quickApproveBooking(${a.id})" style="background:#16845B;color:#FFFFFF;border:none;padding:0.45rem 0.85rem;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.3rem;box-shadow:0 1px 4px rgba(22,132,91,0.25);" title="Approve booking immediately">
-                        ✅ Approve
+                      <button class="admin-action-btn admin-action-btn-primary" onclick="window.quickApproveBooking(${a.id})" title="Approve booking">
+                        Approve
                       </button>
                     ` : ''}
 
                     ${isConfirmed ? `
-                      <button class="btn btn-sm" onclick="window.updateAppointmentStatus(${a.id}, 'completed')" style="background:#475569;color:#FFFFFF;border:none;padding:0.45rem 0.85rem;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;" title="Mark meeting completed">
-                        🏁 Complete
+                      <button class="admin-action-btn admin-action-btn-secondary" onclick="window.updateAppointmentStatus(${a.id}, 'completed')" title="Mark meeting completed">
+                        Complete
                       </button>
                     ` : ''}
 
-                    <button class="btn btn-sm" onclick="window.openRescheduleModal(${a.id}, '${a.appointment_date}', '${a.time_slot}')" style="background:#FFFFFF;border:1px solid #CBD5E1;color:#334155;padding:0.45rem 0.65rem;border-radius:6px;font-size:0.8rem;font-weight:600;cursor:pointer;" title="Change meeting date or time">
-                      🔄 Reschedule
+                    <button class="admin-action-btn admin-action-btn-secondary" onclick="window.openRescheduleModal(${a.id}, '${a.appointment_date}', '${a.time_slot}')" title="Change meeting date or time">
+                      Reschedule
                     </button>
                     
-                    <button class="btn btn-sm" onclick="window.editAppointmentNotes(${a.id}, '${(a.admin_notes || '').replace(/'/g, "\\'")}')" style="background:#FFFFFF;border:1px solid #CBD5E1;color:#334155;padding:0.45rem 0.65rem;border-radius:6px;font-size:0.8rem;font-weight:600;cursor:pointer;" title="Internal technician / survey notes">
-                      📝 Notes
+                    <button class="admin-action-btn admin-action-btn-secondary" onclick="window.editAppointmentNotes(${a.id}, '${(a.admin_notes || '').replace(/'/g, "\\'")}')" title="Internal notes">
+                      Notes
                     </button>
 
                     ${a.status !== 'cancelled' ? `
-                      <button class="btn btn-sm" onclick="window.updateAppointmentStatus(${a.id}, 'cancelled')" style="background:#FFF1F2;border:1px solid #FECDD3;color:#BE123C;padding:0.45rem 0.6rem;border-radius:6px;font-size:0.8rem;cursor:pointer;" title="Cancel this consultation">
-                        ❌
+                      <button class="admin-action-btn admin-action-btn-danger" onclick="window.updateAppointmentStatus(${a.id}, 'cancelled')" title="Cancel consultation">
+                        Cancel
                       </button>
                     ` : ''}
                   </div>
@@ -561,11 +577,11 @@
         body: JSON.stringify({ status: 'confirmed' })
       });
       if (res.ok) {
-        showToast('Booking approved successfully! (बुकिंग स्वीकृत)', 'success');
+        showToast('Booking approved successfully.', 'success');
         await loadAndDisplayAppointments();
       }
     } catch {
-      showToast('Failed to approve booking', 'error');
+      showToast('Failed to approve booking.', 'error');
     }
   };
 
@@ -582,7 +598,7 @@
         if (data.success && data.appointments) {
           if (lastKnownCount > 0 && data.appointments.length > lastKnownCount) {
             const newest = data.appointments[0];
-            showToast(`🔔 New booking from ${newest.full_name}! (नई बुकिंग प्राप्त हुई)`, 'success');
+            showToast(`New booking received from ${newest.full_name}`, 'success');
             adminState.appointments = data.appointments;
             updateAppointmentCounts(data.appointments);
             window.filterAppointmentsLive();
@@ -600,21 +616,21 @@
 
     content.innerHTML = `
       <div style="background:#FFFFFF;color:#0F172A;">
-        <h3 style="font-size:1.35rem;font-weight:800;color:#0B1628;margin-bottom:0.4rem;">Assign Google Meet Room</h3>
-        <p style="color:#64748B;font-size:0.875rem;margin-bottom:1.25rem;">The Google Meet video link will be saved and privately available for this consultation.</p>
+        <h3 style="font-size:1.25rem;font-weight:700;color:#0B1628;margin-bottom:0.35rem;">Google Meet Link</h3>
+        <p style="color:#64748B;font-size:0.825rem;margin-bottom:1.25rem;">Set or update the video meeting room link for this consultation.</p>
         
         <div class="form-group" style="margin-bottom:1.25rem;">
-          <label style="display:block;font-weight:700;color:#334155;font-size:0.85rem;margin-bottom:0.4rem;">Google Meet URL</label>
-          <input type="url" id="meet-url-input" class="form-input" placeholder="https://meet.google.com/xxx-yyyy-zzz" value="${currentLink || ''}" style="width:100%;padding:0.75rem 1rem;border:1.5px solid #CBD5E1;border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
+          <label style="display:block;font-weight:600;color:#334155;font-size:0.825rem;margin-bottom:0.4rem;">Meeting URL</label>
+          <input type="url" id="meet-url-input" class="form-input" placeholder="https://meet.google.com/xxx-yyyy-zzz" value="${currentLink || ''}" style="width:100%;padding:0.65rem 0.85rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem;flex-wrap:wrap;gap:0.75rem;">
-          <button type="button" class="btn btn-sm" onclick="window.autoGenerateMeet(${id})" style="background:#0284C7;color:#FFFFFF;border:none;padding:0.6rem 1rem;border-radius:8px;font-weight:700;cursor:pointer;">
-            ⚡ Auto-Generate Google Meet Room
+          <button type="button" class="admin-action-btn admin-action-btn-dark" onclick="window.autoGenerateMeet(${id})">
+            Auto-Generate Link
           </button>
           <div style="display:flex;gap:0.5rem;">
-            <button class="btn btn-secondary btn-sm" onclick="window.closeModal()" style="background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;padding:0.6rem 1rem;border-radius:8px;font-weight:600;cursor:pointer;">Cancel</button>
-            <button class="btn btn-primary btn-sm" onclick="window.saveMeetLink(${id})" style="background:#16845B;color:#FFFFFF;border:none;padding:0.6rem 1.15rem;border-radius:8px;font-weight:700;cursor:pointer;">Save Link</button>
+            <button class="admin-action-btn admin-action-btn-secondary" onclick="window.closeModal()">Cancel</button>
+            <button class="admin-action-btn admin-action-btn-primary" onclick="window.saveMeetLink(${id})">Save Link</button>
           </div>
         </div>
       </div>
@@ -665,7 +681,7 @@
     }
   };
 
-  // Reschedule Appointment Modal (Clean & Beginner-Friendly)
+  // Reschedule Appointment Modal (Clean Minimalist Theme)
   window.openRescheduleModal = async function (id, currentDate, currentSlot) {
     const modal = document.getElementById('generic-modal');
     const content = document.getElementById('generic-modal-content');
@@ -676,25 +692,25 @@
 
     content.innerHTML = `
       <div style="background:#FFFFFF;color:#0F172A;">
-        <h3 style="font-size:1.35rem;font-weight:800;color:#0B1628;margin-bottom:0.4rem;">Reschedule Online Consultation</h3>
-        <p style="color:#64748B;font-size:0.875rem;margin-bottom:1.25rem;">Current schedule: 📅 ${currentDate} (${currentSlot})</p>
+        <h3 style="font-size:1.25rem;font-weight:700;color:#0B1628;margin-bottom:0.35rem;">Reschedule Consultation</h3>
+        <p style="color:#64748B;font-size:0.825rem;margin-bottom:1.25rem;">Current schedule: ${formatDateClean(currentDate)} (${currentSlot})</p>
 
         <form id="reschedule-form" onsubmit="window.handleRescheduleSubmit(event, ${id})">
-          <div class="form-group" style="margin-bottom:1.25rem;">
-            <label style="display:block;font-weight:700;color:#334155;font-size:0.85rem;margin-bottom:0.4rem;">New Consultation Date <span class="required">*</span></label>
-            <input type="date" id="reschedule-date" class="form-input" required min="${minDate}" value="${currentDate}" onchange="window.loadRescheduleSlots(this.value)" style="width:100%;padding:0.75rem 1rem;border:1.5px solid #CBD5E1;border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
+          <div class="form-group" style="margin-bottom:1.15rem;">
+            <label style="display:block;font-weight:600;color:#334155;font-size:0.825rem;margin-bottom:0.35rem;">New Date <span class="required">*</span></label>
+            <input type="date" id="reschedule-date" class="form-input" required min="${minDate}" value="${currentDate}" onchange="window.loadRescheduleSlots(this.value)" style="width:100%;padding:0.65rem 0.85rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">
           </div>
 
-          <div class="form-group" style="margin-bottom:1.5rem;">
-            <label style="display:block;font-weight:700;color:#334155;font-size:0.85rem;margin-bottom:0.4rem;">Select New Available Slot <span class="required">*</span></label>
+          <div class="form-group" style="margin-bottom:1.35rem;">
+            <label style="display:block;font-weight:600;color:#334155;font-size:0.825rem;margin-bottom:0.35rem;">Select Time Slot <span class="required">*</span></label>
             <div id="reschedule-slots-container">
-              <span style="font-size:0.85rem;color:#64748B;">Checking slot availability...</span>
+              <span style="font-size:0.825rem;color:#64748B;">Checking slot availability...</span>
             </div>
           </div>
 
-          <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="window.closeModal()" style="background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;padding:0.6rem 1rem;border-radius:8px;font-weight:600;cursor:pointer;">Cancel</button>
-            <button type="submit" class="btn btn-primary btn-sm" style="background:#0284C7;color:#FFFFFF;border:none;padding:0.6rem 1.15rem;border-radius:8px;font-weight:700;cursor:pointer;">Confirm Reschedule</button>
+          <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+            <button type="button" class="admin-action-btn admin-action-btn-secondary" onclick="window.closeModal()">Cancel</button>
+            <button type="submit" class="admin-action-btn admin-action-btn-primary">Confirm Reschedule</button>
           </div>
         </form>
       </div>
@@ -715,17 +731,17 @@
       const slots = data.availableSlots || [];
 
       if (slots.length === 0) {
-        container.innerHTML = '<span style="color:#EF4444;font-size:0.85rem;font-weight:600;">No slots available for this date.</span>';
+        container.innerHTML = '<span style="color:#EF4444;font-size:0.825rem;font-weight:500;">No slots available for this date.</span>';
         return;
       }
 
       container.innerHTML = `
-        <select id="reschedule-slot-select" class="form-select" required style="width:100%;padding:0.75rem 1rem;border:1.5px solid #CBD5E1;border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
+        <select id="reschedule-slot-select" class="form-select" required style="width:100%;padding:0.65rem 0.85rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">
           ${slots.map(s => `<option value="${s}">${s}</option>`).join('')}
         </select>
       `;
     } catch {
-      container.innerHTML = '<span style="color:#EF4444;font-size:0.85rem;">Error loading slots</span>';
+      container.innerHTML = '<span style="color:#EF4444;font-size:0.825rem;">Error loading slots</span>';
     }
   };
 
@@ -751,7 +767,7 @@
       const data = await res.json();
       if (res.ok && data.success) {
         window.closeModal();
-        window.showToast(`Meeting rescheduled to ${newDate} (${newSlot})`, 'success');
+        window.showToast(`Meeting rescheduled to ${formatDateClean(newDate)} (${newSlot})`, 'success');
         loadAndDisplayAppointments();
       } else {
         window.showToast(data.error || 'Reschedule conflict', 'error');
@@ -767,12 +783,12 @@
 
     content.innerHTML = `
       <div style="background:#FFFFFF;color:#0F172A;">
-        <h3 style="font-size:1.35rem;font-weight:800;color:#0B1628;margin-bottom:0.4rem;">Consultation &amp; Customer Notes</h3>
-        <p style="color:#64748B;font-size:0.85rem;margin-bottom:1.25rem;">Record rooftop inspection details, shadow analysis notes, or quotation status</p>
-        <textarea id="apt-note-text" class="form-textarea" rows="4" style="width:100%;padding:0.75rem 1rem;border:1.5px solid #CBD5E1;border-radius:8px;font-size:0.95rem;box-sizing:border-box;margin-bottom:1.25rem;">${currentNotes || ''}</textarea>
-        <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-          <button class="btn btn-secondary btn-sm" style="background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;padding:0.6rem 1rem;border-radius:8px;font-weight:600;cursor:pointer;" onclick="window.closeModal()">Cancel</button>
-          <button class="btn btn-primary btn-sm" onclick="window.saveAppointmentNote(${id})" style="background:#16845B;color:#FFFFFF;border:none;padding:0.6rem 1.15rem;border-radius:8px;font-weight:700;cursor:pointer;">Save Notes</button>
+        <h3 style="font-size:1.25rem;font-weight:700;color:#0B1628;margin-bottom:0.35rem;">Internal Consultation Notes</h3>
+        <p style="color:#64748B;font-size:0.825rem;margin-bottom:1.25rem;">Record site visit observations, system size, or customer follow-up notes.</p>
+        <textarea id="apt-note-text" class="form-textarea" rows="4" style="width:100%;padding:0.65rem 0.85rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.9rem;box-sizing:border-box;margin-bottom:1.25rem;">${currentNotes || ''}</textarea>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+          <button class="admin-action-btn admin-action-btn-secondary" onclick="window.closeModal()">Cancel</button>
+          <button class="admin-action-btn admin-action-btn-primary" onclick="window.saveAppointmentNote(${id})">Save Notes</button>
         </div>
       </div>
     `;
@@ -846,7 +862,7 @@
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    window.showToast('Bookings exported to CSV successfully!', 'success');
+    window.showToast('Bookings exported to CSV successfully.', 'success');
   };
 
   window.openBlockDateModal = function () {
@@ -859,16 +875,16 @@
 
     content.innerHTML = `
       <div style="background:#FFFFFF;color:#0F172A;">
-        <h3 style="font-size:1.35rem;font-weight:800;color:#0B1628;margin-bottom:0.4rem;">Block Date or Time Slot</h3>
-        <p style="color:#64748B;font-size:0.85rem;margin-bottom:1.25rem;">Prevent customers from reserving specific dates or slots (e.g. holidays, site audit days)</p>
+        <h3 style="font-size:1.25rem;font-weight:700;color:#0B1628;margin-bottom:0.35rem;">Block Date or Time Slot</h3>
+        <p style="color:#64748B;font-size:0.825rem;margin-bottom:1.25rem;">Prevent bookings on specific dates or slots (e.g. holidays, site survey days).</p>
         <form id="block-slot-form" onsubmit="window.handleBlockSlotSubmit(event)">
           <div class="form-group" style="margin-bottom:1rem;">
-            <label class="form-label" style="color:#CBD5E1;">Date to Block <span class="required">*</span></label>
-            <input type="date" id="block-date" class="form-input admin-dark-input" required min="${minDate}">
+            <label style="display:block;font-weight:600;color:#334155;font-size:0.825rem;margin-bottom:0.35rem;">Date to Block <span class="required">*</span></label>
+            <input type="date" id="block-date" class="form-input" required min="${minDate}" style="width:100%;padding:0.65rem 0.85rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">
           </div>
           <div class="form-group" style="margin-bottom:1rem;">
-            <label class="form-label" style="color:#CBD5E1;">Specific Time Slot (Optional)</label>
-            <select id="block-slot" class="form-select admin-dark-input">
+            <label style="display:block;font-weight:600;color:#334155;font-size:0.825rem;margin-bottom:0.35rem;">Specific Time Slot (Optional)</label>
+            <select id="block-slot" class="form-select" style="width:100%;padding:0.65rem 0.85rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">
               <option value="">Block Entire Day</option>
               <option value="10:00 AM - 11:00 AM">10:00 AM - 11:00 AM</option>
               <option value="11:30 AM - 12:30 PM">11:30 AM - 12:30 PM</option>
@@ -877,13 +893,13 @@
               <option value="05:00 PM - 06:00 PM">05:00 PM - 06:00 PM</option>
             </select>
           </div>
-          <div class="form-group" style="margin-bottom:1.5rem;">
-            <label class="form-label" style="color:#CBD5E1;">Reason</label>
-            <input type="text" id="block-reason" class="form-input admin-dark-input" placeholder="e.g. Public Holiday, Technical Audit Day">
+          <div class="form-group" style="margin-bottom:1.35rem;">
+            <label style="display:block;font-weight:600;color:#334155;font-size:0.825rem;margin-bottom:0.35rem;">Reason</label>
+            <input type="text" id="block-reason" class="form-input" placeholder="e.g. Public Holiday, Technical Audit" style="width:100%;padding:0.65rem 0.85rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.9rem;box-sizing:border-box;">
           </div>
-          <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="window.closeModal()" style="background:#1E293B;color:#CBD5E1;">Cancel</button>
-            <button type="submit" class="btn btn-amber btn-sm">Block Date</button>
+          <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+            <button type="button" class="admin-action-btn admin-action-btn-secondary" onclick="window.closeModal()">Cancel</button>
+            <button type="submit" class="admin-action-btn admin-action-btn-primary">Block Date</button>
           </div>
         </form>
       </div>
@@ -916,38 +932,44 @@
     }
   };
 
-  // TAB 2: Customer Enquiries & Leads
+  // TAB 2: Customer Enquiries & Messages (Clean Minimalist Theme)
   async function renderLeadsTab(container) {
     container.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
-        <div>
-          <h2 style="font-size:1.5rem;font-weight:800;color:var(--navy-900);">Customer Enquiries & Solar Messages</h2>
-          <p style="font-size:0.875rem;color:var(--text-muted);">Confidential messages submitted through website enquiry forms</p>
+      <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.03);padding:1.25rem 1.5rem;margin-bottom:1.25rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h2 style="font-size:1.3rem;font-weight:700;color:#0B1628;letter-spacing:-0.02em;margin-bottom:0.2rem;">
+              Enquiries
+            </h2>
+            <p style="font-size:0.825rem;color:#64748B;margin:0;">
+              Public contact form submissions and customer inquiries.
+            </p>
+          </div>
+          <div style="display:flex;gap:0.5rem;">
+            <button class="admin-action-btn admin-action-btn-secondary" onclick="window.refreshLeads()">
+              Refresh
+            </button>
+            <a href="/api/enquiries/export" target="_blank" class="admin-action-btn admin-action-btn-secondary">
+              Export CSV
+            </a>
+          </div>
         </div>
-        <div style="display:flex;gap:0.75rem;">
-          <a href="/api/enquiries/export" target="_blank" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:0.4rem;">
-            ${window.Icons.download} Export CSV
-          </a>
-          <button class="btn btn-primary btn-sm" onclick="window.refreshLeads()">
-            Refresh
-          </button>
-        </div>
-      </div>
 
-      <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
-        <input type="text" id="lead-search" class="form-input" style="max-width:300px;" placeholder="Search name, email, city, ref..." oninput="window.filterLeads()">
-        <select id="lead-status-filter" class="form-select" style="max-width:180px;" onchange="window.filterLeads()">
-          <option value="all">All Statuses</option>
-          <option value="new">New</option>
-          <option value="in_review">In Review</option>
-          <option value="contacted">Contacted</option>
-          <option value="converted">Converted</option>
-          <option value="closed">Closed</option>
-        </select>
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;flex-wrap:wrap;padding-top:0.85rem;border-top:1px solid #F1F5F9;">
+          <input type="text" id="lead-search" class="form-input" style="max-width:320px;padding:0.45rem 0.85rem;font-size:0.825rem;border:1px solid #CBD5E1;border-radius:6px;background:#FFFFFF;" placeholder="Search name, email, city, ref..." oninput="window.filterLeads()">
+          <select id="lead-status-filter" class="form-select" style="max-width:180px;padding:0.45rem 0.85rem;font-size:0.825rem;border:1px solid #CBD5E1;border-radius:6px;background:#FFFFFF;" onchange="window.filterLeads()">
+            <option value="all">All Statuses</option>
+            <option value="new">New</option>
+            <option value="in_review">In Review</option>
+            <option value="contacted">Contacted</option>
+            <option value="converted">Converted</option>
+            <option value="closed">Closed</option>
+          </select>
+        </div>
       </div>
 
       <div id="leads-table-wrap" class="admin-table-container">
-        <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading enquiries...</div>
+        <div style="padding:2.5rem;text-align:center;color:#64748B;font-size:0.875rem;">Loading enquiries...</div>
       </div>
     `;
 
@@ -974,44 +996,54 @@
     if (!wrap) return;
 
     if (leads.length === 0) {
-      wrap.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);">No enquiries found.</div>';
+      wrap.innerHTML = `
+        <div style="padding:3.5rem 2rem;text-align:center;">
+          <h3 style="font-size:1.05rem;font-weight:600;color:#0B1628;margin-bottom:0.25rem;">No Enquiries Found</h3>
+          <p style="color:#64748B;font-size:0.825rem;margin:0;">No customer enquiries match your search or filter.</p>
+        </div>
+      `;
       return;
     }
 
     wrap.innerHTML = `
-      <table class="admin-table">
+      <table class="admin-modern-table">
         <thead>
           <tr>
-            <th>Ref No / Date</th>
-            <th>Customer</th>
-            <th>Type / Topic</th>
-            <th>Message Details</th>
-            <th>Status</th>
-            <th>Notes</th>
-            <th>Action</th>
+            <th style="padding:0.75rem 1rem;">Ref ID &amp; Date</th>
+            <th style="padding:0.75rem 1rem;">Customer</th>
+            <th style="padding:0.75rem 1rem;">Type &amp; Subject</th>
+            <th style="padding:0.75rem 1rem;">Message</th>
+            <th style="padding:0.75rem 1rem;">Status</th>
+            <th style="padding:0.75rem 1rem;">Actions</th>
           </tr>
         </thead>
         <tbody>
           ${leads.map(lead => `
             <tr>
-              <td>
-                <strong>${lead.reference_no}</strong><br>
-                <span style="font-size:0.75rem;color:var(--text-muted);">${new Date(lead.created_at).toLocaleDateString('en-IN')}</span>
+              <td style="padding:0.85rem 1rem;white-space:nowrap;">
+                <code style="font-size:0.75rem;background:#F1F5F9;padding:2px 6px;border-radius:4px;color:#475569;font-family:monospace;border:1px solid #E2E8F0;">
+                  ${lead.reference_no}
+                </code>
+                <div style="font-size:0.75rem;color:#64748B;margin-top:3px;">
+                  ${new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </div>
               </td>
-              <td>
-                <strong>${lead.name}</strong><br>
-                <span style="font-size:0.8rem;color:#0284C7;">✉️ ${lead.email || 'No email'}</span><br>
-                <span style="font-size:0.75rem;color:var(--solar-green);">${lead.city || 'Madhya Pradesh'}</span>
+              <td style="padding:0.85rem 1rem;">
+                <div style="font-weight:600;color:#0F172A;font-size:0.9rem;">${lead.name}</div>
+                <div style="font-size:0.8rem;color:#64748B;margin-top:2px;">${lead.email || 'No email provided'}</div>
+                <div style="font-size:0.75rem;color:#16845B;margin-top:2px;">${lead.city || 'Madhya Pradesh'}</div>
               </td>
-              <td>
-                <span class="badge-tag badge-blue" style="font-size:0.7rem;margin:0;">${(lead.type || '').replace(/_/g, ' ')}</span>
-                ${lead.service_interest ? `<br><small style="color:var(--solar-amber);font-weight:700;">${lead.service_interest}</small>` : ''}
+              <td style="padding:0.85rem 1rem;">
+                <span style="font-weight:600;color:#0F172A;font-size:0.825rem;text-transform:capitalize;">
+                  ${(lead.type || 'General').replace(/_/g, ' ')}
+                </span>
+                ${lead.service_interest ? `<div style="font-size:0.75rem;color:#E5A93D;font-weight:600;margin-top:2px;">${lead.service_interest}</div>` : ''}
               </td>
-              <td style="max-width:250px;">
-                <span style="font-size:0.8rem;color:var(--text-main);line-height:1.4;display:block;">${lead.message || 'No message content'}</span>
+              <td style="padding:0.85rem 1rem;max-width:280px;">
+                <span style="font-size:0.8rem;color:#334155;line-height:1.45;display:block;">${lead.message || 'No message content'}</span>
               </td>
-              <td>
-                <select class="form-select" style="font-size:0.8rem;padding:0.35rem 0.5rem;" onchange="window.updateLeadStatus(${lead.id}, this.value)">
+              <td style="padding:0.85rem 1rem;">
+                <select class="form-select" style="font-size:0.8rem;padding:0.35rem 0.6rem;border:1px solid #CBD5E1;border-radius:6px;background:#FFFFFF;" onchange="window.updateLeadStatus(${lead.id}, this.value)">
                   <option value="new" ${lead.status === 'new' ? 'selected' : ''}>New</option>
                   <option value="in_review" ${lead.status === 'in_review' ? 'selected' : ''}>In Review</option>
                   <option value="contacted" ${lead.status === 'contacted' ? 'selected' : ''}>Contacted</option>
@@ -1019,11 +1051,8 @@
                   <option value="closed" ${lead.status === 'closed' ? 'selected' : ''}>Closed</option>
                 </select>
               </td>
-              <td style="max-width:180px;">
-                <span style="font-size:0.8rem;color:var(--text-muted);">${lead.notes || 'None'}</span>
-              </td>
-              <td>
-                <button class="btn btn-secondary btn-sm" onclick="window.editLeadNotes(${lead.id}, '${(lead.notes || '').replace(/'/g, "\\'")}')">
+              <td style="padding:0.85rem 1rem;">
+                <button class="admin-action-btn admin-action-btn-secondary" onclick="window.editLeadNotes(${lead.id}, '${(lead.notes || '').replace(/'/g, "\\'")}')">
                   Notes
                 </button>
               </td>
@@ -1059,7 +1088,7 @@
         body: JSON.stringify({ status })
       });
       if (res.ok) {
-        window.showToast('Enquiry status updated', 'success');
+        window.showToast('Enquiry status updated successfully.', 'success');
         loadStats();
       }
     } catch {
@@ -1072,11 +1101,14 @@
     const content = document.getElementById('generic-modal-content');
 
     content.innerHTML = `
-      <h3 style="font-size:1.4rem;font-weight:800;color:var(--navy-900);margin-bottom:1rem;">Internal Notes for Lead</h3>
-      <textarea id="lead-note-text" class="form-textarea" rows="4" style="margin-bottom:1.5rem;">${currentNotes}</textarea>
-      <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-        <button class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="window.saveLeadNote(${id})">Save Notes</button>
+      <div style="background:#FFFFFF;color:#0F172A;">
+        <h3 style="font-size:1.25rem;font-weight:700;color:#0B1628;margin-bottom:0.35rem;">Internal Lead Notes</h3>
+        <p style="color:#64748B;font-size:0.825rem;margin-bottom:1.25rem;">Add internal notes for staff reference on this enquiry.</p>
+        <textarea id="lead-note-text" class="form-textarea" rows="4" style="width:100%;padding:0.65rem 0.85rem;border:1px solid #CBD5E1;border-radius:6px;font-size:0.9rem;box-sizing:border-box;margin-bottom:1.25rem;">${currentNotes}</textarea>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+          <button class="admin-action-btn admin-action-btn-secondary" onclick="window.closeModal()">Cancel</button>
+          <button class="admin-action-btn admin-action-btn-primary" onclick="window.saveLeadNote(${id})">Save Notes</button>
+        </div>
       </div>
     `;
 
@@ -1215,7 +1247,7 @@
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:1.25rem;">
             <div>
               <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.4rem;">
-                <span>📱 Mobile Phones</span>
+                <span>Mobile Phones</span>
                 <strong>${mobilePct}% (${mobileCount})</strong>
               </div>
               <div style="height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden;">
@@ -1224,7 +1256,7 @@
             </div>
             <div>
               <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.4rem;">
-                <span>💻 Desktops & Laptops</span>
+                <span>Desktops &amp; Laptops</span>
                 <strong>${desktopPct}% (${desktopCount})</strong>
               </div>
               <div style="height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden;">
@@ -1233,7 +1265,7 @@
             </div>
             <div>
               <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.4rem;">
-                <span>📟 Tablets</span>
+                <span>Tablets</span>
                 <strong>${tabletPct}% (${tabletCount})</strong>
               </div>
               <div style="height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden;">
