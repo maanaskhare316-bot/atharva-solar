@@ -360,7 +360,7 @@ const server = http.createServer(async (req, res) => {
         query += ' WHERE status = ?';
         params.push(statusFilter);
       }
-      query += ' ORDER BY appointment_date ASC, time_slot ASC';
+      query += ' ORDER BY id DESC';
 
       const appointments = db.prepare(query).all(...params);
       return sendJSON(res, 200, { success: true, appointments });

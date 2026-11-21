@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Atharva Enterprises | Operations & Consultation Command Center</title>
+  <title>Atharva Enterprises | Admin Portal (एडमिन पोर्टल)</title>
   <meta name="robots" content="noindex, nofollow">
   
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E5A93D'><circle cx='12' cy='12' r='4'/><path d='M12 2v2'/><path d='M12 20v2'/></svg>" type="image/svg+xml">
@@ -15,47 +15,42 @@
   
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body class="admin-body" style="background:#081120;color:#F8FAFC;min-height:100vh;">
+<body class="admin-body" style="background:#F8FAFC;color:#0F172A;min-height:100vh;font-family:'Inter',sans-serif;">
 
   <!-- ========================================================================= -->
   <!-- ADMIN AUTHENTICATION SCREEN (Shown when unauthenticated)                  -->
   <!-- ========================================================================= -->
-  <div id="admin-login-screen" class="admin-login-overlay" style="display:none;">
-    <div class="admin-login-card" style="max-width:440px;width:90%;background:#0F1D33;border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:2.5rem;box-shadow:0 20px 40px rgba(0,0,0,0.5);">
+  <div id="admin-login-screen" class="admin-login-overlay" style="display:none;background:linear-gradient(135deg, #0B1628 0%, #102A4C 100%);min-height:100vh;align-items:center;justify-content:center;padding:1.5rem;">
+    <div class="admin-login-card" style="max-width:440px;width:92%;background:#FFFFFF;border-radius:18px;padding:2.75rem 2.25rem;box-shadow:0 25px 50px -12px rgba(0,0,0,0.4);border:1px solid #E2E8F0;">
       <div style="text-align:center;margin-bottom:2rem;">
-        <div style="width:64px;height:64px;background:rgba(229,169,61,0.1);border:1px solid rgba(229,169,61,0.3);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E5A93D" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <div style="width:64px;height:64px;background:rgba(229,169,61,0.15);border:2px solid #E5A93D;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#E5A93D" stroke-width="2.5"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         </div>
-        <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.5rem;font-weight:700;color:#FFFFFF;margin-bottom:0.5rem;">Operations Command Portal</h2>
-        <p style="font-size:0.85rem;color:#94A3B8;">Atharva Enterprises &bull; Authorized Personnel Only</p>
+        <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.65rem;font-weight:800;color:#0B1628;margin-bottom:0.35rem;">Admin Sign In</h2>
+        <p style="font-size:0.875rem;color:#64748B;">Atharva Enterprises &bull; Solar Management Portal</p>
       </div>
 
       <form id="admin-login-form" onsubmit="window.handleAdminLogin(event)">
         <div class="form-group" style="margin-bottom:1.25rem;">
-          <label style="display:block;font-size:0.8rem;font-weight:600;color:#CBD5E1;margin-bottom:0.4rem;">Administrator Email</label>
-          <input type="email" id="login-email" required placeholder="admin@atharvasolar.com" style="width:100%;padding:0.75rem 1rem;background:#081120;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#FFFFFF;font-size:0.9rem;">
+          <label style="display:block;font-size:0.825rem;font-weight:700;color:#334155;margin-bottom:0.4rem;">Admin Email Address</label>
+          <input type="email" id="login-email" required placeholder="admin@atharvasolar.com" style="width:100%;padding:0.8rem 1rem;background:#F8FAFC;border:1.5px solid #CBD5E1;border-radius:8px;color:#0F172A;font-size:0.95rem;box-sizing:border-box;">
         </div>
 
         <div class="form-group" style="margin-bottom:1.5rem;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
-            <label style="font-size:0.8rem;font-weight:600;color:#CBD5E1;">Master Password</label>
-            <button type="button" onclick="window.togglePasswordVisibility('login-password', this)" style="background:none;border:none;color:#E5A93D;font-size:0.75rem;cursor:pointer;">Show Password</button>
+            <label style="font-size:0.825rem;font-weight:700;color:#334155;">Password</label>
+            <button type="button" onclick="window.togglePasswordVisibility('login-password', this)" style="background:none;border:none;color:#0284C7;font-size:0.8rem;font-weight:600;cursor:pointer;">Show Password</button>
           </div>
-          <input type="password" id="login-password" required placeholder="••••••••••••" style="width:100%;padding:0.75rem 1rem;background:#081120;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#FFFFFF;font-size:0.9rem;">
+          <input type="password" id="login-password" required placeholder="••••••••••••" style="width:100%;padding:0.8rem 1rem;background:#F8FAFC;border:1.5px solid #CBD5E1;border-radius:8px;color:#0F172A;font-size:0.95rem;box-sizing:border-box;">
         </div>
 
-        <div style="background:rgba(229,169,61,0.08);border:1px solid rgba(229,169,61,0.2);border-radius:8px;padding:0.75rem;margin-bottom:1.5rem;font-size:0.78rem;color:#E5A93D;display:flex;align-items:flex-start;gap:0.5rem;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:2px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
-          <span>Rate-limited access: 5 consecutive failed attempts trigger a 15-minute security lockout.</span>
-        </div>
-
-        <button type="submit" class="btn btn-primary" style="width:100%;padding:0.85rem;background:#E5A93D;color:#0B1628;font-weight:700;border:none;border-radius:8px;font-size:0.95rem;cursor:pointer;">
+        <button type="submit" class="btn btn-primary" style="width:100%;padding:0.9rem;background:#E5A93D;color:#0B1628;font-weight:800;border:none;border-radius:8px;font-size:1rem;cursor:pointer;box-shadow:0 4px 14px rgba(229,169,61,0.35);transition:all 0.2s;">
           Authenticate Session
         </button>
       </form>
 
-      <div style="text-align:center;margin-top:1.5rem;">
-        <a href="/" style="font-size:0.8rem;color:#94A3B8;text-decoration:none;">&larr; Return to Public Website</a>
+      <div style="text-align:center;margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid #F1F5F9;">
+        <a href="/" style="font-size:0.875rem;color:#0284C7;text-decoration:none;font-weight:600;">&larr; Return to Public Website</a>
       </div>
     </div>
   </div>
@@ -63,83 +58,84 @@
   <!-- ========================================================================= -->
   <!-- ADMIN PORTAL WRAPPER (Shown when authenticated)                           -->
   <!-- ========================================================================= -->
-  <div id="admin-view-wrap" class="admin-view-wrap" style="display:none;">
+  <div id="admin-view-wrap" class="admin-view-wrap" style="display:none;background:#F8FAFC;min-height:100vh;">
     
-    <header class="admin-header" style="background:#0B1628;border-bottom:1px solid rgba(255,255,255,0.1);padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center;">
+    <!-- Top Header -->
+    <header class="admin-header" style="background:#0B1628;color:#FFFFFF;padding:1.1rem 2rem;display:flex;justify-content:space-between;align-items:center;border-bottom:3.5px solid #E5A93D;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
       <div style="display:flex;align-items:center;gap:1.25rem;">
-        <div>
-          <span style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.25rem;color:#FFFFFF;text-transform:uppercase;">Atharva Enterprises</span>
-          <span style="display:block;font-size:0.75rem;color:#E5A93D;font-weight:700;letter-spacing:0.04em;">Operations & Consultation Command Center</span>
-        </div>
+        <a href="/" style="display:flex;align-items:center;gap:0.85rem;text-decoration:none;color:#FFFFFF;">
+          <div style="width:42px;height:42px;background:#E5A93D;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#0B1628;font-weight:900;font-size:1.25rem;box-shadow:0 2px 8px rgba(229,169,61,0.4);">
+            AE
+          </div>
+          <div>
+            <span style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.25rem;color:#FFFFFF;text-transform:uppercase;letter-spacing:0.02em;">Atharva Enterprises</span>
+            <span style="display:block;font-size:0.775rem;color:#E5A93D;font-weight:700;">Solar Customer &amp; Meeting Management &bull; सोलर बुकिंग प्रबंधन</span>
+          </div>
+        </a>
       </div>
 
-      <div style="display:flex;align-items:center;gap:1rem;">
-        <span class="badge" style="background:rgba(22,132,91,0.2);color:#34D399;border:1px solid rgba(52,211,153,0.3);font-size:0.75rem;padding:0.4rem 0.75rem;border-radius:20px;">
-          🟢 Administrator Authenticated
-        </span>
-        <a href="/" class="btn btn-secondary btn-sm" style="background:#0F1D33;color:#F1F5F9;border:1px solid rgba(255,255,255,0.15);padding:0.45rem 0.85rem;border-radius:6px;font-size:0.8rem;text-decoration:none;">
-          Public Website
+      <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+        <a href="/" target="_blank" class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#FFFFFF;border:1px solid rgba(255,255,255,0.25);padding:0.45rem 0.95rem;border-radius:8px;font-size:0.825rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:0.4rem;">
+          🌐 Public Website
         </a>
-        <button class="btn btn-sm" onclick="window.adminLogout()" style="background:#EF4444;color:#FFFFFF;border:none;padding:0.45rem 0.85rem;border-radius:6px;font-size:0.8rem;cursor:pointer;">
+        <button class="btn btn-sm" onclick="window.loadAndDisplayAppointments()" style="background:#16845B;color:#FFFFFF;border:none;padding:0.45rem 1rem;border-radius:8px;font-size:0.825rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;box-shadow:0 2px 6px rgba(22,132,91,0.3);" title="Refresh latest bookings">
+          🔄 Refresh Bookings (ताज़ा करें)
+        </button>
+        <button class="btn btn-sm" onclick="window.adminLogout()" style="background:#EF4444;color:#FFFFFF;border:none;padding:0.45rem 0.95rem;border-radius:8px;font-size:0.825rem;font-weight:700;cursor:pointer;">
           Sign Out
         </button>
       </div>
     </header>
 
-    <!-- Admin Navigation Tabs -->
-    <div class="admin-nav-tabs" style="background:#0F1D33;border-bottom:1px solid rgba(255,255,255,0.08);padding:0 2rem;display:flex;gap:0.5rem;overflow-x:auto;">
-      <button class="admin-tab-btn active" data-tab="appointments" onclick="window.switchAdminTab('appointments')">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-        Online Consultations & Meetings
+    <!-- Navigation Tabs -->
+    <div style="background:#FFFFFF;border-bottom:1px solid #E2E8F0;padding:0 2rem;display:flex;gap:1.75rem;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+      <button class="admin-tab-btn active" data-tab="appointments" onclick="window.switchAdminTab('appointments')" style="background:none;border:none;padding:1.15rem 0.25rem;font-size:0.95rem;font-weight:700;color:#0B1628;cursor:pointer;border-bottom:3px solid #E5A93D;display:inline-flex;align-items:center;gap:0.5rem;">
+        📅 Customer Bookings (मीटिंग्स)
+        <span id="nav-pending-badge" style="background:#EF4444;color:#FFFFFF;font-size:0.75rem;padding:0.15rem 0.55rem;border-radius:12px;font-weight:800;display:none;">0</span>
       </button>
-      <button class="admin-tab-btn" data-tab="leads" onclick="window.switchAdminTab('leads')">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Customer Enquiries
+      <button class="admin-tab-btn" data-tab="leads" onclick="window.switchAdminTab('leads')" style="background:none;border:none;padding:1.15rem 0.25rem;font-size:0.95rem;font-weight:700;color:#64748B;cursor:pointer;border-bottom:3px solid transparent;display:inline-flex;align-items:center;gap:0.5rem;">
+        📩 Website Inquiries (सामान्य पूछताछ)
       </button>
-      <button class="admin-tab-btn" data-tab="analytics" onclick="window.switchAdminTab('analytics')">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-        Visitor Metrics & Analytics
-      </button>
-      <button class="admin-tab-btn" data-tab="brands" onclick="window.switchAdminTab('brands')">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/></svg>
-        Solar Brands Availability
-      </button>
-      <button class="admin-tab-btn" data-tab="security" onclick="window.switchAdminTab('security')">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Security & Password
+      <button class="admin-tab-btn" data-tab="security" onclick="window.switchAdminTab('security')" style="background:none;border:none;padding:1.15rem 0.25rem;font-size:0.95rem;font-weight:700;color:#64748B;cursor:pointer;border-bottom:3px solid transparent;display:inline-flex;align-items:center;gap:0.5rem;">
+        ⚙️ Settings & Password
       </button>
     </div>
 
-    <!-- Admin Main Body -->
-    <main class="admin-content-pane" style="padding:2rem;">
+    <!-- Main Content -->
+    <main style="padding:2rem;max-width:1440px;margin:0 auto;">
       
-      <!-- KPI Stats Grid -->
-      <div class="kpi-cards-grid">
-        <div class="kpi-card">
-          <div class="kpi-label">Online Consultations</div>
-          <div id="kpi-total-appointments" class="kpi-value" style="color:#E5A93D;">0</div>
+      <!-- 4 Simple KPI Cards -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:1.25rem;margin-bottom:2rem;">
+        
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-left:5px solid #F59E0B;border-radius:12px;padding:1.25rem;box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+          <div style="font-size:0.8rem;color:#64748B;font-weight:700;text-transform:uppercase;margin-bottom:0.35rem;">⏳ Pending Review (पेंडिंग)</div>
+          <div id="kpi-pending-count" style="font-size:2rem;font-weight:800;color:#D97706;font-family:'Plus Jakarta Sans',sans-serif;">0</div>
+          <div style="font-size:0.75rem;color:#94A3B8;">Customer requests awaiting approval</div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">General Inquiries</div>
-          <div id="kpi-total-enquiries" class="kpi-value" style="color:#16845B;">0</div>
+
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-left:5px solid #10B981;border-radius:12px;padding:1.25rem;box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+          <div style="font-size:0.8rem;color:#64748B;font-weight:700;text-transform:uppercase;margin-bottom:0.35rem;">✅ Confirmed (स्वीकृत)</div>
+          <div id="kpi-confirmed-count" style="font-size:2rem;font-weight:800;color:#059669;font-family:'Plus Jakarta Sans',sans-serif;">0</div>
+          <div style="font-size:0.75rem;color:#94A3B8;">Approved meetings with link</div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Total Unique Visitors</div>
-          <div id="kpi-unique-visitors" class="kpi-value" style="color:#38BDF8;">0</div>
+
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-left:5px solid #0284C7;border-radius:12px;padding:1.25rem;box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+          <div style="font-size:0.8rem;color:#64748B;font-weight:700;text-transform:uppercase;margin-bottom:0.35rem;">📅 Total Bookings (कुल)</div>
+          <div id="kpi-total-appointments" style="font-size:2rem;font-weight:800;color:#0284C7;font-family:'Plus Jakarta Sans',sans-serif;">0</div>
+          <div style="font-size:0.75rem;color:#94A3B8;">All consultation appointments</div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Today's Visitors</div>
-          <div id="kpi-today-visitors" class="kpi-value" style="color:#34D399;">0</div>
+
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-left:5px solid #6366F1;border-radius:12px;padding:1.25rem;box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+          <div style="font-size:0.8rem;color:#64748B;font-weight:700;text-transform:uppercase;margin-bottom:0.35rem;">📩 General Inquiries (पूछताछ)</div>
+          <div id="kpi-total-enquiries" style="font-size:2rem;font-weight:800;color:#4F46E5;font-family:'Plus Jakarta Sans',sans-serif;">0</div>
+          <div style="font-size:0.75rem;color:#94A3B8;">Contact form messages</div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Total Site Visits</div>
-          <div id="kpi-total-views" class="kpi-value">0</div>
-        </div>
+
       </div>
 
-      <!-- Dynamic Tab Content -->
+      <!-- Tab Content Area -->
       <div id="admin-tab-content">
-        <!-- Managed by admin.js -->
+        <!-- Rendered dynamically by admin.js -->
       </div>
 
     </main>
@@ -148,7 +144,7 @@
 
   <!-- Modal and Toast Container -->
   <div id="generic-modal" class="modal-overlay">
-    <div class="modal-dialog">
+    <div class="modal-dialog" style="background:#FFFFFF;color:#0F172A;border-radius:16px;max-width:580px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.35);padding:2.25rem;">
       <button class="modal-close-btn" onclick="window.closeModal()" aria-label="Close modal">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </button>

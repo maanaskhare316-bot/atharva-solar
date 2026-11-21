@@ -250,73 +250,82 @@
   function switchTab(tab) {
     adminState.currentTab = tab;
     document.querySelectorAll('.admin-tab-btn').forEach(b => {
-      if (b.dataset.tab === tab) b.classList.add('active');
-      else b.classList.remove('active');
+      if (b.dataset.tab === tab) {
+        b.classList.add('active');
+        b.style.color = '#0B1628';
+        b.style.borderBottom = '3px solid #E5A93D';
+      } else {
+        b.classList.remove('active');
+        b.style.color = '#64748B';
+        b.style.borderBottom = '3px solid transparent';
+      }
     });
 
     const pane = document.getElementById('admin-tab-content');
     if (tab === 'appointments') renderAppointmentsTab(pane);
     else if (tab === 'leads') renderLeadsTab(pane);
-    else if (tab === 'analytics') renderAnalyticsTab(pane);
-    else if (tab === 'brands') renderBrandsTab(pane);
     else if (tab === 'security') renderSecurityTab(pane);
+    else renderAppointmentsTab(pane);
   }
 
   window.switchAdminTab = switchTab;
 
-  // TAB 1: Online Meetings & Consultations Command Center
+  // TAB 1: Online Meetings & Consultations Command Center (Clean & Beginner-Friendly)
   async function renderAppointmentsTab(container) {
     container.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
-        <div>
-          <h2 style="font-size:1.55rem;font-weight:900;color:#FFFFFF;letter-spacing:-0.02em;">📅 Online Meeting Bookings & Video Rooms</h2>
-          <p style="font-size:0.875rem;color:#94A3B8;">Approve bookings, assign Google Meet links, reschedule slots, and manage client consultations</p>
+      <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.04);padding:1.5rem 1.75rem;margin-bottom:1.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem;">
+          <div>
+            <h2 style="font-size:1.45rem;font-weight:800;color:#0B1628;letter-spacing:-0.02em;margin-bottom:0.25rem;">
+              📅 Customer Consultation Bookings (ग्राहक मीटिंग्स)
+            </h2>
+            <p style="font-size:0.875rem;color:#64748B;">
+              Every appointment booked on the public website appears here in real-time. Click <strong>"Approve"</strong> or <strong>"Generate Meet"</strong> to confirm.
+            </p>
+          </div>
+          <div style="display:flex;gap:0.65rem;flex-wrap:wrap;">
+            <button class="btn btn-sm" onclick="window.loadAndDisplayAppointments()" style="background:#16845B;color:#FFFFFF;border:none;padding:0.5rem 1rem;border-radius:8px;font-size:0.85rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;box-shadow:0 2px 6px rgba(22,132,91,0.25);">
+              🔄 Refresh List (ताज़ा करें)
+            </button>
+            <button class="btn btn-sm" onclick="window.exportAppointmentsCSV()" style="background:#F8FAFC;color:#0284C7;border:1.5px solid #CBD5E1;padding:0.5rem 0.95rem;border-radius:8px;font-size:0.85rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
+              ${window.Icons.download} Export CSV
+            </button>
+            <button class="btn btn-sm" onclick="window.openBlockDateModal()" style="background:#FFFBEB;color:#B45309;border:1.5px solid #FCD34D;padding:0.5rem 0.95rem;border-radius:8px;font-size:0.85rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
+              ${window.Icons.calendar} Block Date / Slot
+            </button>
+          </div>
         </div>
-        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-          <button class="btn btn-secondary btn-sm" onclick="window.exportAppointmentsCSV()" style="background:#0F1D33;color:#38BDF8;border-color:rgba(56,189,248,0.3);display:inline-flex;align-items:center;gap:0.4rem;">
-            ${window.Icons.download} Export CSV
-          </button>
-          <button class="btn btn-amber btn-sm" onclick="window.openBlockDateModal()">
-            ${window.Icons.calendar} Block Date / Slot
-          </button>
-          <button class="btn btn-primary btn-sm" onclick="window.loadAndDisplayAppointments()">
-            Refresh Bookings
-          </button>
-        </div>
-      </div>
 
-      <!-- Quick Status Filter Ribbon & Live Search Bar -->
-      <div class="admin-card-pane" style="margin-bottom:1.5rem;padding:1.25rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
-          
-          <!-- Filter Buttons -->
+        <!-- Filter Chips & Search Bar -->
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;padding-top:1rem;border-top:1px solid #F1F5F9;">
           <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="appointment-filter-chips">
-            <button class="btn btn-sm" style="background:#0284C7;color:#FFFFFF;border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('all', this)">
+            <button class="btn btn-sm" style="background:#0284C7;color:#FFFFFF;border:none;border-radius:20px;padding:0.4rem 1rem;font-weight:700;cursor:pointer;" onclick="window.setAppointmentFilter('all', this)">
               All Bookings (<span id="count-all-apts">0</span>)
             </button>
-            <button class="btn btn-sm" style="background:#1E293B;color:#FBBF24;border:1px solid rgba(245,158,11,0.3);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('pending', this)">
+            <button class="btn btn-sm" style="background:#F1F5F9;color:#92400E;border:1px solid #FCD34D;border-radius:20px;padding:0.4rem 1rem;font-weight:700;cursor:pointer;" onclick="window.setAppointmentFilter('pending', this)">
               ⏳ Pending (<span id="count-pending-apts">0</span>)
             </button>
-            <button class="btn btn-sm" style="background:#1E293B;color:#34D399;border:1px solid rgba(52,211,153,0.3);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('confirmed', this)">
+            <button class="btn btn-sm" style="background:#F1F5F9;color:#065F46;border:1px solid #6EE7B7;border-radius:20px;padding:0.4rem 1rem;font-weight:700;cursor:pointer;" onclick="window.setAppointmentFilter('confirmed', this)">
               ✅ Confirmed (<span id="count-confirmed-apts">0</span>)
             </button>
-            <button class="btn btn-sm" style="background:#1E293B;color:#38BDF8;border:1px solid rgba(56,189,248,0.3);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('today', this)">
-              📅 Today's Meetings (<span id="count-today-apts">0</span>)
+            <button class="btn btn-sm" style="background:#F1F5F9;color:#0369A1;border:1px solid #7DD3FC;border-radius:20px;padding:0.4rem 1rem;font-weight:700;cursor:pointer;" onclick="window.setAppointmentFilter('today', this)">
+              📅 Today (<span id="count-today-apts">0</span>)
             </button>
-            <button class="btn btn-sm" style="background:#1E293B;color:#CBD5E1;border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:0.4rem 1rem;" onclick="window.setAppointmentFilter('completed', this)">
+            <button class="btn btn-sm" style="background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;border-radius:20px;padding:0.4rem 1rem;font-weight:700;cursor:pointer;" onclick="window.setAppointmentFilter('completed', this)">
               🏁 Completed (<span id="count-completed-apts">0</span>)
             </button>
           </div>
 
-          <!-- Live Search -->
+          <!-- Live Search Input -->
           <div style="min-width:260px;flex:1;max-width:380px;">
-            <input type="text" id="appointment-search-input" class="form-input admin-dark-input" placeholder="🔍 Search customer, email, ref ID..." oninput="window.filterAppointmentsLive()" style="padding:0.55rem 0.85rem;font-size:0.85rem;">
+            <input type="text" id="appointment-search-input" class="form-input" placeholder="🔍 Search customer, email, city, ref ID..." oninput="window.filterAppointmentsLive()" style="padding:0.55rem 0.95rem;font-size:0.875rem;border:1.5px solid #CBD5E1;border-radius:8px;background:#F8FAFC;width:100%;box-sizing:border-box;">
           </div>
         </div>
       </div>
 
+      <!-- Bookings Table Container -->
       <div id="appointments-table-wrap" class="admin-table-container">
-        <div style="padding:2.5rem;text-align:center;color:#94A3B8;">Loading appointments...</div>
+        <div style="padding:3rem;text-align:center;color:#64748B;">Loading consultation bookings...</div>
       </div>
     `;
 
@@ -328,9 +337,13 @@
   window.setAppointmentFilter = function (filter, btnEl) {
     adminState.appointmentFilter = filter;
     document.querySelectorAll('#appointment-filter-chips button').forEach(b => {
-      b.style.background = '#1E293B';
+      b.style.background = '#F1F5F9';
+      b.style.color = '#334155';
     });
-    if (btnEl) btnEl.style.background = '#0284C7';
+    if (btnEl) {
+      btnEl.style.background = '#0284C7';
+      btnEl.style.color = '#FFFFFF';
+    }
     window.filterAppointmentsLive();
   };
 
@@ -363,23 +376,45 @@
       const data = await res.json();
       if (data.success && data.appointments) {
         adminState.appointments = data.appointments;
-
-        const todayStr = new Date().toISOString().split('T')[0];
-        const elAll = document.getElementById('count-all-apts');
-        if (elAll) elAll.textContent = data.appointments.length;
-        const elPending = document.getElementById('count-pending-apts');
-        if (elPending) elPending.textContent = data.appointments.filter(a => a.status === 'pending').length;
-        const elConfirmed = document.getElementById('count-confirmed-apts');
-        if (elConfirmed) elConfirmed.textContent = data.appointments.filter(a => a.status === 'confirmed').length;
-        const elToday = document.getElementById('count-today-apts');
-        if (elToday) elToday.textContent = data.appointments.filter(a => a.appointment_date === todayStr).length;
-        const elCompleted = document.getElementById('count-completed-apts');
-        if (elCompleted) elCompleted.textContent = data.appointments.filter(a => a.status === 'completed').length;
-
-        renderAppointmentsTable(data.appointments);
+        updateAppointmentCounts(data.appointments);
+        window.filterAppointmentsLive();
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching appointments:', err);
+    }
+  }
+
+  function updateAppointmentCounts(apts) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const pendingCount = apts.filter(a => a.status === 'pending').length;
+    const confirmedCount = apts.filter(a => a.status === 'confirmed').length;
+    const todayCount = apts.filter(a => a.appointment_date === todayStr).length;
+    const completedCount = apts.filter(a => a.status === 'completed').length;
+
+    const elAll = document.getElementById('count-all-apts');
+    if (elAll) elAll.textContent = apts.length;
+    const elPending = document.getElementById('count-pending-apts');
+    if (elPending) elPending.textContent = pendingCount;
+    const elConfirmed = document.getElementById('count-confirmed-apts');
+    if (elConfirmed) elConfirmed.textContent = confirmedCount;
+    const elToday = document.getElementById('count-today-apts');
+    if (elToday) elToday.textContent = todayCount;
+    const elCompleted = document.getElementById('count-completed-apts');
+    if (elCompleted) elCompleted.textContent = completedCount;
+
+    // Update top KPI cards
+    const kpiPending = document.getElementById('kpi-pending-count');
+    if (kpiPending) kpiPending.textContent = pendingCount;
+    const kpiConfirmed = document.getElementById('kpi-confirmed-count');
+    if (kpiConfirmed) kpiConfirmed.textContent = confirmedCount;
+    const kpiTotal = document.getElementById('kpi-total-appointments');
+    if (kpiTotal) kpiTotal.textContent = apts.length;
+
+    // Update Nav Tab Badge
+    const navBadge = document.getElementById('nav-pending-badge');
+    if (navBadge) {
+      navBadge.textContent = pendingCount;
+      navBadge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
     }
   }
 
@@ -390,95 +425,123 @@
     if (!wrap) return;
 
     if (apts.length === 0) {
-      wrap.innerHTML = '<div style="padding:3rem;text-align:center;color:#94A3B8;">No meeting appointments match your filter.</div>';
+      wrap.innerHTML = `
+        <div style="padding:4rem 2rem;text-align:center;">
+          <div style="font-size:2.5rem;margin-bottom:0.75rem;">📅</div>
+          <h3 style="font-size:1.15rem;font-weight:700;color:#0B1628;margin-bottom:0.35rem;">No Bookings Found</h3>
+          <p style="color:#64748B;font-size:0.875rem;">No consultation bookings match your current search or filter.</p>
+        </div>
+      `;
       return;
     }
 
     const todayStr = new Date().toISOString().split('T')[0];
 
     wrap.innerHTML = `
-      <table class="admin-table">
+      <table class="admin-modern-table">
         <thead>
           <tr>
-            <th>Booking Ref / Date</th>
-            <th>Time Slot</th>
-            <th>Customer & Email</th>
-            <th>Consultation Type</th>
+            <th>Customer &amp; Ref ID</th>
+            <th>Consultation Date &amp; Slot</th>
+            <th>Type &amp; Location</th>
             <th>Google Meet Link</th>
             <th>Status</th>
-            <th>Actions</th>
+            <th>Quick Actions</th>
           </tr>
         </thead>
         <tbody>
           ${apts.map(a => {
             const isToday = a.appointment_date === todayStr;
             const hasMeetLink = Boolean(a.meeting_link && a.meeting_link.trim());
+            const isPending = a.status === 'pending';
+            const isConfirmed = a.status === 'confirmed';
+
+            let statusBadge = `<span class="badge-pending">⏳ Under Review</span>`;
+            if (a.status === 'confirmed') statusBadge = `<span class="badge-confirmed">✅ Confirmed</span>`;
+            else if (a.status === 'completed') statusBadge = `<span class="badge-completed">🏁 Completed</span>`;
+            else if (a.status === 'cancelled') statusBadge = `<span class="badge-cancelled">❌ Cancelled</span>`;
+            else if (a.status === 'rejected') statusBadge = `<span class="badge-cancelled">🚫 Rejected</span>`;
 
             return `
-              <tr>
+              <tr style="${isPending ? 'background:#FFFDF7;' : ''}">
                 <td>
-                  <strong style="color:#FFFFFF;font-size:0.9rem;font-family:monospace;">${a.reference_no}</strong><br>
-                  <span style="font-weight:700;color:${isToday ? '#38BDF8' : '#CBD5E1'};font-size:0.85rem;">
+                  <strong style="color:#0B1628;font-size:1rem;display:block;">${a.full_name}</strong>
+                  <span style="font-size:0.825rem;color:#0284C7;display:block;margin-top:2px;">✉️ ${a.email}</span>
+                  <div style="margin-top:4px;">
+                    <code style="font-size:0.75rem;background:#F1F5F9;padding:2px 6px;border-radius:4px;color:#475569;font-family:monospace;border:1px solid #E2E8F0;">
+                      ${a.reference_no}
+                    </code>
+                  </div>
+                </td>
+                <td>
+                  <div style="font-weight:800;font-size:0.925rem;color:#0F172A;">
                     📅 ${a.appointment_date}
-                  </span>
-                  ${isToday ? '<span class="badge" style="background:#EF4444;color:#FFFFFF;font-size:0.65rem;margin-left:4px;padding:0.15rem 0.4rem;">TODAY</span>' : ''}
-                </td>
-                <td>
-                  <span class="badge" style="background:rgba(56,189,248,0.15);color:#38BDF8;border:1px solid rgba(56,189,248,0.3);font-size:0.75rem;white-space:nowrap;">
+                    ${isToday ? '<span style="background:#EF4444;color:#FFFFFF;padding:2px 6px;border-radius:4px;font-size:0.65rem;font-weight:800;margin-left:4px;">TODAY</span>' : ''}
+                  </div>
+                  <div style="color:#0284C7;font-weight:700;font-size:0.825rem;margin-top:3px;">
                     ⏰ ${a.time_slot}
-                  </span>
+                  </div>
                 </td>
                 <td>
-                  <strong style="color:#FFFFFF;font-size:0.95rem;">${a.full_name}</strong><br>
-                  <span style="font-size:0.825rem;color:#38BDF8;">✉️ ${a.email}</span><br>
-                  <span style="font-size:0.75rem;color:#34D399;font-weight:700;">📍 ${a.city || 'Madhya Pradesh'} (${(a.property_type || 'residential').toUpperCase()})</span>
-                </td>
-                <td>
-                  <span class="badge" style="background:rgba(255,255,255,0.08);color:#F1F5F9;font-size:0.725rem;font-weight:700;text-transform:uppercase;">
+                  <span style="font-weight:700;color:#334155;text-transform:capitalize;font-size:0.85rem;">
                     ${(a.meeting_type || 'solar_consultation').replace(/_/g, ' ')}
                   </span>
-                  ${a.bill_range ? `<br><small style="color:#FBBF24;">⚡ ${a.bill_range}</small>` : ''}
+                  <div style="font-size:0.8rem;color:#16845B;font-weight:600;margin-top:2px;">
+                    📍 ${a.city || 'Madhya Pradesh'} (${(a.property_type || 'residential').toUpperCase()})
+                  </div>
+                  ${a.requirements ? `<div style="font-size:0.775rem;color:#64748B;font-style:italic;margin-top:3px;max-width:200px;">"${a.requirements}"</div>` : ''}
                 </td>
                 <td>
                   ${hasMeetLink ? `
                     <div style="display:flex;align-items:center;gap:0.4rem;">
-                      <a href="${a.meeting_link}" target="_blank" rel="noopener noreferrer" style="color:#38BDF8;font-size:0.8rem;text-decoration:underline;word-break:break-all;">
-                        ${a.meeting_link.replace('https://meet.google.com/', '')}
+                      <a href="${a.meeting_link}" target="_blank" rel="noopener noreferrer" style="background:#0284C7;color:#FFFFFF;padding:0.4rem 0.75rem;border-radius:6px;font-size:0.8rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:0.35rem;" title="Join Google Meet video room">
+                        🎥 Join Meet
                       </a>
-                      <button class="btn btn-sm" onclick="window.openAssignMeetModal(${a.id}, '${a.meeting_link}')" title="Edit Link" style="background:#1E293B;padding:0.25rem 0.5rem;font-size:0.7rem;color:#CBD5E1;">
+                      <button class="btn btn-sm" onclick="window.openAssignMeetModal(${a.id}, '${a.meeting_link}')" title="Edit Meeting Link" style="background:#FFFFFF;border:1px solid #CBD5E1;padding:0.35rem 0.55rem;border-radius:6px;font-size:0.75rem;cursor:pointer;">
                         ✏️
                       </button>
                     </div>
                   ` : `
                     <div style="display:flex;gap:0.4rem;">
-                      <button class="btn btn-sm" onclick="window.autoGenerateMeet(${a.id})" style="background:#0284C7;color:#FFFFFF;padding:0.35rem 0.6rem;font-size:0.75rem;" title="Auto generate Google Meet room">
+                      <button class="btn btn-sm" onclick="window.autoGenerateMeet(${a.id})" style="background:#0284C7;color:#FFFFFF;border:none;padding:0.4rem 0.75rem;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.3rem;" title="Auto generate Google Meet room">
                         ⚡ Generate Meet
                       </button>
-                      <button class="btn btn-sm" onclick="window.openAssignMeetModal(${a.id}, '')" style="background:#1E293B;color:#CBD5E1;padding:0.35rem 0.5rem;font-size:0.75rem;">
-                        Paste Link
+                      <button class="btn btn-sm" onclick="window.openAssignMeetModal(${a.id}, '')" style="background:#FFFFFF;border:1px solid #CBD5E1;color:#475569;padding:0.4rem 0.55rem;border-radius:6px;font-size:0.75rem;cursor:pointer;" title="Paste meeting link manually">
+                        Paste
                       </button>
                     </div>
                   `}
                 </td>
                 <td>
-                  <select class="form-select admin-dark-input" style="font-size:0.8rem;padding:0.4rem 0.65rem;font-weight:700;border-radius:8px;color:${
-                    a.status === 'confirmed' ? '#34D399' : a.status === 'pending' ? '#FBBF24' : a.status === 'completed' ? '#38BDF8' : '#EF4444'
-                  };" onchange="window.updateAppointmentStatus(${a.id}, this.value)">
-                    <option value="pending" ${a.status === 'pending' ? 'selected' : ''}>⏳ Pending</option>
-                    <option value="confirmed" ${a.status === 'confirmed' ? 'selected' : ''}>✅ Confirmed</option>
-                    <option value="completed" ${a.status === 'completed' ? 'selected' : ''}>🏁 Completed</option>
-                    <option value="cancelled" ${a.status === 'cancelled' ? 'selected' : ''}>❌ Cancelled</option>
-                    <option value="rejected" ${a.status === 'rejected' ? 'selected' : ''}>🚫 Rejected</option>
-                  </select>
+                  ${statusBadge}
                 </td>
                 <td>
-                  <div style="display:flex;gap:0.4rem;align-items:center;">
-                    <button class="btn btn-sm" style="background:#0F1D33;color:#38BDF8;border:1px solid rgba(56,189,248,0.3);padding:0.4rem 0.65rem;font-size:0.75rem;" onclick="window.openRescheduleModal(${a.id}, '${a.appointment_date}', '${a.time_slot}')" title="Reschedule Date & Slot">
+                  <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
+                    ${isPending ? `
+                      <button class="btn btn-sm" onclick="window.quickApproveBooking(${a.id})" style="background:#16845B;color:#FFFFFF;border:none;padding:0.45rem 0.85rem;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.3rem;box-shadow:0 1px 4px rgba(22,132,91,0.25);" title="Approve booking immediately">
+                        ✅ Approve
+                      </button>
+                    ` : ''}
+
+                    ${isConfirmed ? `
+                      <button class="btn btn-sm" onclick="window.updateAppointmentStatus(${a.id}, 'completed')" style="background:#475569;color:#FFFFFF;border:none;padding:0.45rem 0.85rem;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;" title="Mark meeting completed">
+                        🏁 Complete
+                      </button>
+                    ` : ''}
+
+                    <button class="btn btn-sm" onclick="window.openRescheduleModal(${a.id}, '${a.appointment_date}', '${a.time_slot}')" style="background:#FFFFFF;border:1px solid #CBD5E1;color:#334155;padding:0.45rem 0.65rem;border-radius:6px;font-size:0.8rem;font-weight:600;cursor:pointer;" title="Change meeting date or time">
                       🔄 Reschedule
                     </button>
-                    <button class="btn btn-sm" style="background:#1E293B;color:#CBD5E1;border:1px solid rgba(255,255,255,0.12);padding:0.4rem 0.55rem;font-size:0.75rem;" onclick="window.editAppointmentNotes(${a.id}, '${(a.admin_notes || '').replace(/'/g, "\\'")}')" title="Internal Notes">
+                    
+                    <button class="btn btn-sm" onclick="window.editAppointmentNotes(${a.id}, '${(a.admin_notes || '').replace(/'/g, "\\'")}')" style="background:#FFFFFF;border:1px solid #CBD5E1;color:#334155;padding:0.45rem 0.65rem;border-radius:6px;font-size:0.8rem;font-weight:600;cursor:pointer;" title="Internal technician / survey notes">
                       📝 Notes
                     </button>
+
+                    ${a.status !== 'cancelled' ? `
+                      <button class="btn btn-sm" onclick="window.updateAppointmentStatus(${a.id}, 'cancelled')" style="background:#FFF1F2;border:1px solid #FECDD3;color:#BE123C;padding:0.45rem 0.6rem;border-radius:6px;font-size:0.8rem;cursor:pointer;" title="Cancel this consultation">
+                        ❌
+                      </button>
+                    ` : ''}
                   </div>
                 </td>
               </tr>
@@ -489,28 +552,69 @@
     `;
   }
 
+  // Quick 1-Click Approval
+  window.quickApproveBooking = async function (id) {
+    try {
+      const res = await adminFetch(`/api/appointments/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'confirmed' })
+      });
+      if (res.ok) {
+        showToast('Booking approved successfully! (बुकिंग स्वीकृत)', 'success');
+        await loadAndDisplayAppointments();
+      }
+    } catch {
+      showToast('Failed to approve booking', 'error');
+    }
+  };
+
+  // Background Auto-Polling (checks for new public bookings every 20 seconds)
+  let lastKnownCount = 0;
+  setInterval(async () => {
+    if (!adminState.token) return;
+    try {
+      const res = await fetch('/api/appointments', {
+        headers: { 'Authorization': `Bearer ${adminState.token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.appointments) {
+          if (lastKnownCount > 0 && data.appointments.length > lastKnownCount) {
+            const newest = data.appointments[0];
+            showToast(`🔔 New booking from ${newest.full_name}! (नई बुकिंग प्राप्त हुई)`, 'success');
+            adminState.appointments = data.appointments;
+            updateAppointmentCounts(data.appointments);
+            window.filterAppointmentsLive();
+          }
+          lastKnownCount = data.appointments.length;
+        }
+      }
+    } catch {}
+  }, 20000);
+
   // Assign or Edit Meeting Link Modal
   window.openAssignMeetModal = function (id, currentLink) {
     const modal = document.getElementById('generic-modal');
     const content = document.getElementById('generic-modal-content');
 
     content.innerHTML = `
-      <div style="background:#0E1D36;padding:1.75rem;border-radius:14px;color:#FFFFFF;">
-        <h3 style="font-size:1.35rem;font-weight:800;color:#FFFFFF;margin-bottom:0.5rem;">Assign Google Meet Room</h3>
-        <p style="color:#94A3B8;font-size:0.85rem;margin-bottom:1.25rem;">The link will be privately delivered to the customer upon confirmation.</p>
+      <div style="background:#FFFFFF;color:#0F172A;">
+        <h3 style="font-size:1.35rem;font-weight:800;color:#0B1628;margin-bottom:0.4rem;">Assign Google Meet Room</h3>
+        <p style="color:#64748B;font-size:0.875rem;margin-bottom:1.25rem;">The Google Meet video link will be saved and privately available for this consultation.</p>
         
         <div class="form-group" style="margin-bottom:1.25rem;">
-          <label class="form-label" style="color:#CBD5E1;">Google Meet / Video Room URL</label>
-          <input type="url" id="meet-url-input" class="form-input admin-dark-input" placeholder="https://meet.google.com/xxx-yyyy-zzz" value="${currentLink || ''}">
+          <label style="display:block;font-weight:700;color:#334155;font-size:0.85rem;margin-bottom:0.4rem;">Google Meet URL</label>
+          <input type="url" id="meet-url-input" class="form-input" placeholder="https://meet.google.com/xxx-yyyy-zzz" value="${currentLink || ''}" style="width:100%;padding:0.75rem 1rem;border:1.5px solid #CBD5E1;border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem;flex-wrap:wrap;gap:0.75rem;">
-          <button type="button" class="btn btn-sm" onclick="window.autoGenerateMeet(${id})" style="background:#0284C7;color:#FFFFFF;">
+          <button type="button" class="btn btn-sm" onclick="window.autoGenerateMeet(${id})" style="background:#0284C7;color:#FFFFFF;border:none;padding:0.6rem 1rem;border-radius:8px;font-weight:700;cursor:pointer;">
             ⚡ Auto-Generate Google Meet Room
           </button>
           <div style="display:flex;gap:0.5rem;">
-            <button class="btn btn-secondary btn-sm" onclick="window.closeModal()" style="background:#1E293B;color:#CBD5E1;">Cancel</button>
-            <button class="btn btn-primary btn-sm" onclick="window.saveMeetLink(${id})">Save Link</button>
+            <button class="btn btn-secondary btn-sm" onclick="window.closeModal()" style="background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;padding:0.6rem 1rem;border-radius:8px;font-weight:600;cursor:pointer;">Cancel</button>
+            <button class="btn btn-primary btn-sm" onclick="window.saveMeetLink(${id})" style="background:#16845B;color:#FFFFFF;border:none;padding:0.6rem 1.15rem;border-radius:8px;font-weight:700;cursor:pointer;">Save Link</button>
           </div>
         </div>
       </div>
@@ -561,7 +665,7 @@
     }
   };
 
-  // Reschedule Appointment Modal
+  // Reschedule Appointment Modal (Clean & Beginner-Friendly)
   window.openRescheduleModal = async function (id, currentDate, currentSlot) {
     const modal = document.getElementById('generic-modal');
     const content = document.getElementById('generic-modal-content');
@@ -571,26 +675,26 @@
     const minDate = tomorrow.toISOString().split('T')[0];
 
     content.innerHTML = `
-      <div style="background:#0E1D36;padding:1.75rem;border-radius:14px;color:#FFFFFF;">
-        <h3 style="font-size:1.35rem;font-weight:800;color:#FFFFFF;margin-bottom:0.5rem;">Reschedule Online Consultation</h3>
-        <p style="color:#94A3B8;font-size:0.85rem;margin-bottom:1.25rem;">Current schedule: 📅 ${currentDate} (${currentSlot})</p>
+      <div style="background:#FFFFFF;color:#0F172A;">
+        <h3 style="font-size:1.35rem;font-weight:800;color:#0B1628;margin-bottom:0.4rem;">Reschedule Online Consultation</h3>
+        <p style="color:#64748B;font-size:0.875rem;margin-bottom:1.25rem;">Current schedule: 📅 ${currentDate} (${currentSlot})</p>
 
         <form id="reschedule-form" onsubmit="window.handleRescheduleSubmit(event, ${id})">
           <div class="form-group" style="margin-bottom:1.25rem;">
-            <label class="form-label" style="color:#CBD5E1;">New Consultation Date <span class="required">*</span></label>
-            <input type="date" id="reschedule-date" class="form-input admin-dark-input" required min="${minDate}" value="${currentDate}" onchange="window.loadRescheduleSlots(this.value)">
+            <label style="display:block;font-weight:700;color:#334155;font-size:0.85rem;margin-bottom:0.4rem;">New Consultation Date <span class="required">*</span></label>
+            <input type="date" id="reschedule-date" class="form-input" required min="${minDate}" value="${currentDate}" onchange="window.loadRescheduleSlots(this.value)" style="width:100%;padding:0.75rem 1rem;border:1.5px solid #CBD5E1;border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
           </div>
 
           <div class="form-group" style="margin-bottom:1.5rem;">
-            <label class="form-label" style="color:#CBD5E1;">Select New Available Slot <span class="required">*</span></label>
+            <label style="display:block;font-weight:700;color:#334155;font-size:0.85rem;margin-bottom:0.4rem;">Select New Available Slot <span class="required">*</span></label>
             <div id="reschedule-slots-container">
-              <span style="font-size:0.85rem;color:#94A3B8;">Checking slot availability...</span>
+              <span style="font-size:0.85rem;color:#64748B;">Checking slot availability...</span>
             </div>
           </div>
 
           <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="window.closeModal()" style="background:#1E293B;color:#CBD5E1;">Cancel</button>
-            <button type="submit" class="btn btn-primary btn-sm">Confirm Reschedule</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.closeModal()" style="background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;padding:0.6rem 1rem;border-radius:8px;font-weight:600;cursor:pointer;">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm" style="background:#0284C7;color:#FFFFFF;border:none;padding:0.6rem 1.15rem;border-radius:8px;font-weight:700;cursor:pointer;">Confirm Reschedule</button>
           </div>
         </form>
       </div>
@@ -611,17 +715,17 @@
       const slots = data.availableSlots || [];
 
       if (slots.length === 0) {
-        container.innerHTML = '<span style="color:#F87171;font-size:0.85rem;">No slots available for this date.</span>';
+        container.innerHTML = '<span style="color:#EF4444;font-size:0.85rem;font-weight:600;">No slots available for this date.</span>';
         return;
       }
 
       container.innerHTML = `
-        <select id="reschedule-slot-select" class="form-select admin-dark-input" required>
+        <select id="reschedule-slot-select" class="form-select" required style="width:100%;padding:0.75rem 1rem;border:1.5px solid #CBD5E1;border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
           ${slots.map(s => `<option value="${s}">${s}</option>`).join('')}
         </select>
       `;
     } catch {
-      container.innerHTML = '<span style="color:#F87171;font-size:0.85rem;">Error loading slots</span>';
+      container.innerHTML = '<span style="color:#EF4444;font-size:0.85rem;">Error loading slots</span>';
     }
   };
 
@@ -662,13 +766,13 @@
     const content = document.getElementById('generic-modal-content');
 
     content.innerHTML = `
-      <div style="background:#0E1D36;padding:1.5rem;border-radius:14px;color:#FFFFFF;">
-        <h3 style="font-size:1.35rem;font-weight:800;color:#FFFFFF;margin-bottom:0.5rem;">Consultation & Technical Notes</h3>
-        <p style="color:#94A3B8;font-size:0.825rem;margin-bottom:1.25rem;">Record load requirements, system configuration proposals, or followup actions</p>
-        <textarea id="apt-note-text" class="form-textarea admin-dark-input" rows="4" style="margin-bottom:1.25rem;width:100%;">${currentNotes || ''}</textarea>
+      <div style="background:#FFFFFF;color:#0F172A;">
+        <h3 style="font-size:1.35rem;font-weight:800;color:#0B1628;margin-bottom:0.4rem;">Consultation &amp; Customer Notes</h3>
+        <p style="color:#64748B;font-size:0.85rem;margin-bottom:1.25rem;">Record rooftop inspection details, shadow analysis notes, or quotation status</p>
+        <textarea id="apt-note-text" class="form-textarea" rows="4" style="width:100%;padding:0.75rem 1rem;border:1.5px solid #CBD5E1;border-radius:8px;font-size:0.95rem;box-sizing:border-box;margin-bottom:1.25rem;">${currentNotes || ''}</textarea>
         <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-          <button class="btn btn-secondary btn-sm" style="background:#1E293B;color:#CBD5E1;" onclick="window.closeModal()">Cancel</button>
-          <button class="btn btn-primary btn-sm" onclick="window.saveAppointmentNote(${id})">Save Notes</button>
+          <button class="btn btn-secondary btn-sm" style="background:#F1F5F9;color:#475569;border:1px solid #CBD5E1;padding:0.6rem 1rem;border-radius:8px;font-weight:600;cursor:pointer;" onclick="window.closeModal()">Cancel</button>
+          <button class="btn btn-primary btn-sm" onclick="window.saveAppointmentNote(${id})" style="background:#16845B;color:#FFFFFF;border:none;padding:0.6rem 1.15rem;border-radius:8px;font-weight:700;cursor:pointer;">Save Notes</button>
         </div>
       </div>
     `;
@@ -704,7 +808,7 @@
       });
       if (res.ok) {
         window.showToast(`Appointment status updated to ${status.toUpperCase()}`, 'success');
-        loadStats();
+        loadAndDisplayAppointments();
       }
     } catch {
       window.showToast('Failed to update appointment', 'error');
@@ -754,10 +858,9 @@
     const minDate = tomorrow.toISOString().split('T')[0];
 
     content.innerHTML = `
-      <div style="background:#0E1D36;padding:1.75rem;border-radius:14px;color:#FFFFFF;">
-        <h3 style="font-size:1.4rem;font-weight:800;color:#FFFFFF;margin-bottom:0.5rem;">Block Date or Time Slot</h3>
-        <p style="color:#94A3B8;font-size:0.875rem;margin-bottom:1.5rem;">Prevent customers from reserving specific dates or slots</p>
-
+      <div style="background:#FFFFFF;color:#0F172A;">
+        <h3 style="font-size:1.35rem;font-weight:800;color:#0B1628;margin-bottom:0.4rem;">Block Date or Time Slot</h3>
+        <p style="color:#64748B;font-size:0.85rem;margin-bottom:1.25rem;">Prevent customers from reserving specific dates or slots (e.g. holidays, site audit days)</p>
         <form id="block-slot-form" onsubmit="window.handleBlockSlotSubmit(event)">
           <div class="form-group" style="margin-bottom:1rem;">
             <label class="form-label" style="color:#CBD5E1;">Date to Block <span class="required">*</span></label>
