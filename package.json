@@ -5,7 +5,8 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "test": "node verify-system.js"
+    "build": "echo 'No build step required'",
+    "test": "node test-upgrade.js"
   },
   "engines": {
     "node": ">=20.0.0"
