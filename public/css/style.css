@@ -1412,6 +1412,10 @@ img {
   padding: 1.5rem;
 }
 
+.modal-overlay.active {
+  display: flex !important;
+}
+
 .modal-dialog {
   background: #FFFFFF;
   color: var(--navy-900);

@@ -18,6 +18,46 @@
     brands: []
   };
 
+  // Toast notification system for admin
+  function showToast(message, type = 'success') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.className = 'toast-container';
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    const icon = type === 'success'
+      ? '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>'
+      : '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>';
+
+    toast.innerHTML = `
+      <div style="flex-shrink:0;">${icon}</div>
+      <div style="flex-grow:1;">${message}</div>
+    `;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(10px)';
+      toast.style.transition = 'all 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }
+  window.showToast = showToast;
+
+  // Global Modal Control for Admin
+  window.closeModal = function () {
+    const modal = document.getElementById('generic-modal');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.style.display = 'none';
+    }
+  };
+
   // Helper for authenticated fetch
   async function adminFetch(url, options = {}) {
     options.headers = options.headers || {};
@@ -91,12 +131,16 @@
 
   window.handleAdminLogin = async function (e) {
     e.preventDefault();
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
+    const emailInput = document.getElementById('login-email');
+    const passwordInput = document.getElementById('login-password');
+    const email = emailInput ? emailInput.value.trim() : '';
+    const password = passwordInput ? passwordInput.value : '';
     const submitBtn = e.target.querySelector('button[type="submit"]');
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Verifying Credentials...';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Verifying Credentials...';
+    }
 
     try {
       const res = await fetch('/api/admin/login', {
@@ -107,16 +151,12 @@
       const data = await res.json();
 
       if (res.status === 429) {
-        window.showToast(data.error || 'Too many attempts. Account locked temporarily.', 'error');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Sign In to Operations Portal';
+        showToast(data.error || 'Too many attempts. Account locked temporarily.', 'error');
         return;
       }
 
       if (!res.ok || !data.success) {
-        window.showToast(data.error || 'Invalid email or password', 'error');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Sign In to Operations Portal';
+        showToast(data.error || 'Invalid email or password', 'error');
         return;
       }
 
@@ -124,13 +164,20 @@
       adminState.user = data.user;
       localStorage.setItem('atharva_admin_token', data.token);
 
-      window.showToast(`Welcome back, ${data.user.name}!`, 'success');
-      document.getElementById('admin-login-screen').style.display = 'none';
+      showToast(`Welcome back, ${data.user.name}!`, 'success');
+      const loginScreen = document.getElementById('admin-login-screen');
+      const adminWrap = document.getElementById('admin-view-wrap');
+      if (loginScreen) loginScreen.style.display = 'none';
+      if (adminWrap) adminWrap.style.display = 'block';
       renderAdminUI();
-    } catch {
-      window.showToast('Authentication connection error. Please try again.', 'error');
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Sign In to Operations Portal';
+    } catch (err) {
+      console.error('Admin authentication error:', err);
+      showToast('Authentication connection error. Please try again.', 'error');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Authenticate Session';
+      }
     }
   };
 
@@ -464,6 +511,7 @@
     `;
 
     modal.classList.add('active');
+    modal.style.display = 'flex';
   };
 
   window.saveMeetLink = async function (id) {
@@ -543,6 +591,7 @@
     `;
 
     modal.classList.add('active');
+    modal.style.display = 'flex';
     window.loadRescheduleSlots(currentDate);
   };
 
@@ -619,6 +668,7 @@
     `;
 
     modal.classList.add('active');
+    modal.style.display = 'flex';
   };
 
   window.saveAppointmentNote = async function (id) {
@@ -731,6 +781,7 @@
     `;
 
     modal.classList.add('active');
+    modal.style.display = 'flex';
   };
 
   window.handleBlockSlotSubmit = async function (e) {
@@ -921,6 +972,7 @@
     `;
 
     modal.classList.add('active');
+    modal.style.display = 'flex';
   };
 
   window.saveLeadNote = async function (id) {
