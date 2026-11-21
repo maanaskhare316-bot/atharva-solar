@@ -962,7 +962,11 @@ const server = http.createServer(async (req, res) => {
   // -------------------------------------------------------------
   // STATIC FILE SERVING WITH SECURITY CONTROLS
   // -------------------------------------------------------------
-  let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
+  let targetFile = pathname === '/' ? 'index.html' : pathname;
+  if (targetFile === '/admin' || targetFile === '/admin/' || targetFile === 'admin') {
+    targetFile = 'admin.html';
+  }
+  let filePath = path.join(PUBLIC_DIR, targetFile);
   const normalizedPath = path.normalize(filePath);
 
   // Security check: ensure path stays within PUBLIC_DIR

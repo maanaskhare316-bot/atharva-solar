@@ -114,9 +114,17 @@ async function runTests() {
 
     assert(!homeRes.body.includes('+91 90390 05531'), 'Public HTML does not contain raw phone number');
     assert(!homeRes.body.includes('wa.me/919039005531'), 'Public HTML does not contain direct WhatsApp link');
-    assert(homeRes.body.includes('Book an Online Meeting'), 'Public HTML contains "Book an Online Meeting" CTAs');
+    assert(homeRes.body.includes('Book an Online Consultation'), 'Public HTML contains "Book an Online Consultation" CTAs');
+    assert(!homeRes.body.includes('calc-slider'), 'Public HTML contains zero solar calculator elements');
+    assert(!homeRes.body.includes('countdown-wrapper'), 'Public HTML contains zero subsidy countdown timers');
+    assert(!homeRes.body.includes('admin-view-wrap'), 'Public HTML is completely decoupled from admin dashboard');
     assert(homeRes.body.includes('track-booking'), 'Public HTML contains status lookup section');
     assert(homeRes.body.includes('faq'), 'Public HTML contains FAQ section');
+
+    // Verify admin page separation
+    const adminPageRes = await request('/admin');
+    assert(adminPageRes.statusCode === 200, 'Dedicated /admin route served successfully');
+    assert(adminPageRes.body.includes('admin-login-screen'), 'Admin portal contains secure authentication gate');
 
     // -------------------------------------------------------------
     // Test 2: Customer Booking Submission (POST /api/appointments)

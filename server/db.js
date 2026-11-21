@@ -192,7 +192,7 @@ function seedDefaultData() {
     db.prepare('UPDATE admin_users SET password_hash = ? WHERE id = ?').run(upgradedHash, existingAdmin.id);
   }
 
-  // 2. Seed Default Settings - Without public phone numbers
+  // 2. Seed Default Settings - Without public phone numbers or subsidy clutter
   const defaultSettings = [
     ['company_name', 'Atharva Enterprises'],
     ['tagline', 'Powering Your Future with Clean Solar Energy.'],
@@ -200,11 +200,8 @@ function seedDefaultData() {
     ['market', 'Madhya Pradesh & Central India'],
     ['office_address', 'Regional Operations across Bhopal, Indore, Jabalpur, Gwalior & Ujjain, Madhya Pradesh'],
     ['pwd_license_info', 'Registered A Class Electrical & PWD Contractor with Government of Madhya Pradesh.'],
-    ['subsidy_deadline', '2027-03-31'],
-    ['subsidy_max_amount', '78000'],
-    ['subsidy_disclaimer', 'Subsidy is subject to government scheme guidelines, eligibility, approved system capacity, installation requirements and successful application approval. The amount of up to ₹78,000 is not guaranteed for every customer. Verify current scheme rules before applying.'],
     ['meeting_platform', 'Google Meet'],
-    ['booking_advance_days', '30']
+    ['booking_advance_days', '45']
   ];
 
   const insertSetting = db.prepare(`
@@ -214,8 +211,8 @@ function seedDefaultData() {
     insertSetting.run(key, value);
   }
 
-  // Clean up any legacy public phone numbers from settings
-  db.prepare("DELETE FROM settings WHERE key IN ('phone', 'whatsapp', 'whatsapp_digits')").run();
+  // Clean up any legacy public phone numbers or obsolete subsidy keys from settings
+  db.prepare("DELETE FROM settings WHERE key IN ('phone', 'whatsapp', 'whatsapp_digits', 'subsidy_deadline', 'subsidy_max_amount', 'subsidy_disclaimer')").run();
 
   // 3. Seed Available Solar Brands
   const defaultBrands = [
@@ -303,8 +300,8 @@ function seedDefaultData() {
       slug: 'residential-solar',
       title: 'Residential Solar Installation',
       short_description: 'Turnkey rooftop solar solutions for bungalows, apartments, and villas to slash electricity bills up to 90%.',
-      full_description: 'We deliver comprehensive residential solar power systems engineered specifically for your roof layout. From net metering coordination to government subsidy documentation, Atharva Enterprises ensures effortless transition to solar power.',
-      benefits: JSON.stringify(['Slash up to 90% monthly electricity bills', 'Eligible for Government subsidy up to ₹78,000', '25-year performance warranty on Tier-1 panels', 'Net-metering integration with MP Discom']),
+      full_description: 'We deliver comprehensive residential solar power systems engineered specifically for your roof layout. From net metering coordination to certified electrical commissioning, Atharva Enterprises ensures an effortless transition to solar power.',
+      benefits: JSON.stringify(['Slash up to 90% monthly electricity bills', 'Comprehensive CAD roof layout & shadow analysis', '25-year performance warranty on Tier-1 panels', 'Turnkey net-metering integration with MP Discom']),
       icon: 'Home',
       order: 1
     },
@@ -331,7 +328,7 @@ function seedDefaultData() {
       title: 'Solar Panel Supply',
       short_description: 'Wholesale and project supply of certified Tier-1 DCR and Non-DCR solar modules from top Indian & global brands.',
       full_description: 'As a trusted solar supplier, we provide verified solar panels from Adani, Tata Power, Waaree, RenewSys, and more, backed by manufacturer test reports and genuine warranty coverage.',
-      benefits: JSON.stringify(['100% Genuine, tested manufacturer batches', 'DCR panels compliant with Central subsidy', 'Bifacial, Mono PERC, and TOPCon modules', 'Competitive pricing with prompt dispatch']),
+      benefits: JSON.stringify(['100% Genuine, tested manufacturer batches', 'ALMM approved high-efficiency modules', 'Bifacial, Mono PERC, and TOPCon modules', 'Competitive project supply with verified warranty']),
       icon: 'Sun',
       order: 4
     },

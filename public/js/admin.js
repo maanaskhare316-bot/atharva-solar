@@ -34,7 +34,8 @@
 
   // Check auth on load
   async function checkAuth() {
-    document.getElementById('public-view-wrap').style.display = 'none';
+    const publicWrap = document.getElementById('public-view-wrap');
+    if (publicWrap) publicWrap.style.display = 'none';
 
     if (!adminState.token) {
       showLoginScreen();
@@ -57,8 +58,10 @@
   }
 
   function showLoginScreen() {
-    document.getElementById('public-view-wrap').style.display = 'none';
-    document.getElementById('admin-view-wrap').style.display = 'none';
+    const publicWrap = document.getElementById('public-view-wrap');
+    if (publicWrap) publicWrap.style.display = 'none';
+    const adminWrap = document.getElementById('admin-view-wrap');
+    if (adminWrap) adminWrap.style.display = 'none';
     const loginScreen = document.getElementById('admin-login-screen');
     if (loginScreen) {
       loginScreen.style.display = 'flex';
@@ -71,13 +74,7 @@
 
   window.exitAdminToPublic = function (e) {
     if (e) e.preventDefault();
-    const loginScreen = document.getElementById('admin-login-screen');
-    const adminWrap = document.getElementById('admin-view-wrap');
-    const publicWrap = document.getElementById('public-view-wrap');
-    if (loginScreen) loginScreen.style.display = 'none';
-    if (adminWrap) adminWrap.style.display = 'none';
-    if (publicWrap) publicWrap.style.display = 'block';
-    window.location.hash = '';
+    window.location.href = '/';
   };
 
   window.togglePasswordVisibility = function (inputId, triggerEl) {
@@ -1163,16 +1160,17 @@
   // Route listener
   function handleRoute() {
     const isSecretRoute = 
+      window.location.pathname.includes('admin') ||
       window.location.hash === '#admin-portal' || 
-      window.location.hash === '#admin' || 
-      window.location.pathname === '/admin-portal' || 
-      window.location.pathname === '/admin';
+      window.location.hash === '#admin';
 
-    if (isSecretRoute) {
+    if (isSecretRoute || document.getElementById('admin-view-wrap')) {
       checkAuth();
     } else {
-      document.getElementById('admin-view-wrap').style.display = 'none';
-      document.getElementById('public-view-wrap').style.display = 'block';
+      const adminWrap = document.getElementById('admin-view-wrap');
+      if (adminWrap) adminWrap.style.display = 'none';
+      const publicWrap = document.getElementById('public-view-wrap');
+      if (publicWrap) publicWrap.style.display = 'block';
     }
   }
 
