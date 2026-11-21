@@ -66,7 +66,7 @@
     }
     const res = await fetch(url, options);
     if (res.status === 401) {
-      adminLogout();
+      adminLogout(true);
       throw new Error('Session expired. Please log in again.');
     }
     return res;
@@ -181,21 +181,27 @@
     }
   };
 
-  window.adminLogout = async function () {
-    try {
-      await fetch('/api/admin/logout', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${adminState.token}`
-        }
-      });
-    } catch {}
-
+  window.adminLogout = async function (silent = false) {
+    const currentToken = adminState.token;
     adminState.token = '';
     adminState.user = null;
     localStorage.removeItem('atharva_admin_token');
+
+    if (currentToken) {
+      try {
+        await fetch('/api/admin/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentToken}`
+          }
+        });
+      } catch {}
+    }
+
     showLoginScreen();
-    window.showToast('Signed out of admin portal', 'info');
+    if (!silent) {
+      showToast('Signed out of admin portal', 'info');
+    }
   };
 
   function renderAdminUI() {
